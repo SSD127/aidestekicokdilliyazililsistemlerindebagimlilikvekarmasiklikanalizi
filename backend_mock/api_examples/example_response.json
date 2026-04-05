@@ -1,0 +1,183 @@
+{
+  "complexity": [
+    {
+      "name": "src/api/routes.py",
+      "complexity": 45,
+      "lines": 234
+    },
+    {
+      "name": "src/models/user.py",
+      "complexity": 72,
+      "lines": 456
+    },
+    {
+      "name": "src/services/auth.py",
+      "complexity": 38,
+      "lines": 189
+    }
+  ],
+  "performance": {
+    "time_complexity": [
+      {
+        "complexity": "O(1)",
+        "count": 180,
+        "description": "Constant time"
+      },
+      {
+        "complexity": "O(log n)",
+        "count": 65,
+        "description": "Logarithmic"
+      },
+      {
+        "complexity": "O(n)",
+        "count": 95,
+        "description": "Linear"
+      },
+      {
+        "complexity": "O(n log n)",
+        "count": 42,
+        "description": "Linearithmic"
+      },
+      {
+        "complexity": "O(n²)",
+        "count": 18,
+        "description": "Quadratic"
+      }
+    ],
+    "space_complexity": [
+      {
+        "complexity": "O(1)",
+        "count": 230,
+        "description": "Constant space"
+      },
+      {
+        "complexity": "O(n)",
+        "count": 125,
+        "description": "Linear"
+      },
+      {
+        "complexity": "O(n²)",
+        "count": 8,
+        "description": "Quadratic"
+      }
+    ],
+    "avg_execution_time": 25,
+    "memory_usage": 128.5,
+    "optimizable_functions": 32
+  },
+  "disk_space": {
+    "file_types": [
+      {
+        "type": "Python",
+        "size_mb": 15.8,
+        "count": 234
+      },
+      {
+        "type": "JavaScript",
+        "size_mb": 8.3,
+        "count": 89
+      },
+      {
+        "type": "JSON",
+        "size_mb": 2.1,
+        "count": 45
+      },
+      {
+        "type": "CSS",
+        "size_mb": 1.4,
+        "count": 23
+      },
+      {
+        "type": "Images",
+        "size_mb": 18.6,
+        "count": 156
+      }
+    ],
+    "largest_files": [
+      {
+        "file": "static/images/banner_large.png",
+        "size_mb": 12.4
+      },
+      {
+        "file": "data/training_dataset.json",
+        "size_mb": 9.8
+      },
+      {
+        "file": "dist/bundle.min.js",
+        "size_mb": 6.5
+      }
+    ],
+    "total_size_mb": 48.6,
+    "file_count": 456
+  },
+  "code_analysis": {
+    "total_files": 234,
+    "total_lines": 45678,
+    "total_functions": 1234,
+    "total_classes": 156,
+    "code_quality_score": 82,
+    "test_coverage": 75,
+    "documentation_coverage": 68,
+    "duplication_rate": 8.5,
+    "languages": [
+      {
+        "language": "Python",
+        "percentage": 65.4,
+        "lines": 29873
+      },
+      {
+        "language": "JavaScript",
+        "percentage": 24.8,
+        "lines": 11328
+      },
+      {
+        "language": "CSS",
+        "percentage": 6.2,
+        "lines": 2832
+      },
+      {
+        "language": "HTML",
+        "percentage": 3.6,
+        "lines": 1645
+      }
+    ],
+    "issues": {
+      "critical": 2,
+      "warnings": 28,
+      "code_smells": 45,
+      "security_hotspots": 6
+    },
+    "dependencies": {
+      "total": 142,
+      "direct": 38,
+      "outdated": 12,
+      "vulnerable": 3
+    }
+  },
+  "file_metrics": [
+    {
+      "file": "src/api/routes/user_routes.py",
+      "lines": 345,
+      "complexity": 67,
+      "maintainability": 45,
+      "functions": 18,
+      "classes": 2
+    },
+    {
+      "file": "src/models/user_model.py",
+      "lines": 289,
+      "complexity": 52,
+      "maintainability": 58,
+      "functions": 12,
+      "classes": 3
+    },
+    {
+      "file": "src/services/authentication.py",
+      "lines": 456,
+      "complexity": 78,
+      "maintainability": 38,
+      "functions": 24,
+      "classes": 1
+    }
+  ]
+}
