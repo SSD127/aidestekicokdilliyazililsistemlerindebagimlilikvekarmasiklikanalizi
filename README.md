@@ -28,7 +28,7 @@ Bu repo, “Mini SonarQube” benzeri bir **statik analiz** sistemi geliştirir:
 - **Run modeli**: her analiz çalıştırması bir “run” olarak saklanır (trend için)
 
 ## Takım Rolleri (5 kişi)
-- **Backend & Scrum Master (Senin rolün)**: Supabase şema/ER, Auth+RLS, API endpoint’leri, GitHub pipeline, Kanban/sprint yönetimi
+- **Backend & Scrum Master : Supabase şema/ER, Auth+RLS, API endpoint’leri, GitHub pipeline, Kanban/sprint yönetimi
 - **Engine Lead**: Tree-sitter ile ayrıştırma (AST/CST)
 - **Logic Lead**: McCabe/Halstead algoritmaları
 - **UI/UX Lead**: Panel ve görselleştirmeler (grafikler/heatmap)
