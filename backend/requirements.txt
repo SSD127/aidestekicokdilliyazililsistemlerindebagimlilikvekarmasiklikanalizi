@@ -4,3 +4,11 @@ pydantic
 pydantic-settings
 python-dotenv
 supabase
+requests
+numpy
+networkx
+tree-sitter
+tree-sitter-python
+tree-sitter-java
+tree-sitter-javascript
+tree-sitter-typescript

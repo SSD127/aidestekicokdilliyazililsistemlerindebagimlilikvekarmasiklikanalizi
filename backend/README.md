@@ -23,7 +23,10 @@ Bu klasor, PolyMetric projesinin backend omurgasinin ilk surumunu icerir.
 - `GET /api/projects/{project_id}/runs/{run_id}/summary`
 - `GET /api/projects/{project_id}/runs/{run_id}/hotspots`
 - `GET /api/projects/{project_id}/runs/{run_id}/dependency-graph`
+- `GET /api/projects/{project_id}/runs/{run_id}/ai-insight`
 - `GET /api/projects/{project_id}/trends`
+- `POST /api/internal/runs/{run_id}/status` *(X-Internal-Api-Key gerekli)*
+- `POST /api/internal/runs/{run_id}/ingest` *(X-Internal-Api-Key gerekli)*
 
 ## Not
 Bu ilk surumda veri depolama `in-memory` tutuldu. Sonraki adimda Supabase tablolarina gecilerek kalici hale getirilecektir.

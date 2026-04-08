@@ -1,0 +1,82 @@
+{
+  "run_id": "8e35bc35-9480-47af-8635-965f9b3bdb0d",
+  "project_id": "6f6dd412-2e2d-4c71-99f0-7a48695fbc91",
+  "commit_hash": "a1b2c3d4e5f6",
+  "branch_name": "main",
+  "commit_tag": "v0.1.0",
+  "analyzed_at": "2026-04-05T12:00:00Z",
+  "parser_version": "tree-sitter:v0.1",
+  "grammar_version": "python:v1",
+  "files": [
+    {
+      "path": "app/main.py",
+      "language": "python",
+      "loc": 120,
+      "complexity_score": 11,
+      "maintainability_index": 74.2,
+      "dependency_count": 4
+    },
+    {
+      "path": "app/storage.py",
+      "language": "python",
+      "loc": 95,
+      "complexity_score": 8,
+      "maintainability_index": 78.1,
+      "dependency_count": 2
+    }
+  ],
+  "functions": [
+    {
+      "file_path": "app/main.py",
+      "function_name": "create_run",
+      "start_line": 40,
+      "end_line": 75,
+      "cyclomatic_complexity": 13,
+      "halstead_score": 31.4,
+      "loc": 36,
+      "risk_score": 10
+    },
+    {
+      "file_path": "app/storage.py",
+      "function_name": "build_trend",
+      "start_line": 120,
+      "end_line": 144,
+      "cyclomatic_complexity": 9,
+      "halstead_score": 24.8,
+      "loc": 25,
+      "risk_score": 5
+    }
+  ],
+  "dependencies": [
+    {
+      "source_path": "app/main.py",
+      "target_path": "app/storage.py",
+      "dependency_type": "import",
+      "source_symbol": null,
+      "target_symbol": null
+    },
+    {
+      "source_path": "app/main.py",
+      "target_path": "app/schemas.py",
+      "dependency_type": "import",
+      "source_symbol": null,
+      "target_symbol": null
+    }
+  ],
+  "hotspots": [
+    {
+      "file_path": "app/main.py",
+      "function_name": "create_run",
+      "risk_score": 10,
+      "reason": "Cyclomatic complexity: 13",
+      "rank": 1
+    },
+    {
+      "file_path": "app/storage.py",
+      "function_name": "build_trend",
+      "risk_score": 5,
+      "reason": "Cyclomatic complexity: 9",
+      "rank": 2
+    }
+  ]
+}
