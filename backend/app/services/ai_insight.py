@@ -1,3 +1,17 @@
+"""
+ai_insight.py — AI Destekli Kod Analizi Yorum Servisi
+
+Bu dosya analiz run'ının metrik özetini bir AI modeline göndererek
+geliştiriciye yönelik kısa Türkçe yorum ve iyileştirme önerileri üretir.
+
+Provider öncelik sırası:
+  1. OpenAI (OPENAI_API_KEY varsa)
+  2. Gemini (GEMINI_API_KEY varsa)
+  3. Kural tabanlı fallback (hiçbir anahtar yoksa)
+
+Bu sayede API anahtarı olmayan ortamlarda bile sistem çalışmaya devam eder.
+"""
+
 from __future__ import annotations
 
 import json
@@ -7,6 +21,8 @@ import requests
 
 
 def _build_prompt(run_summary: dict[str, Any]) -> str:
+    # AI'ya gönderilecek prompt'u oluşturur
+    # Run özeti JSON olarak eklenir; model Türkçe yanıt üretmesi için yönlendirilir
     return (
         "Sen kıdemli bir yazılım mimarısın. "
         "Asagidaki analiz verilerini inceleyerek en fazla 6 satırda Turkce bir degerlendirme yap. "
@@ -16,6 +32,7 @@ def _build_prompt(run_summary: dict[str, Any]) -> str:
 
 
 def _fallback_insight(run_summary: dict[str, Any]) -> str:
+    # API anahtarı olmadığında hotspot verisine bakarak basit kural tabanlı yorum üretir
     hotspots = run_summary.get("hotspots", [])
     top = hotspots[0] if hotspots else None
     if not top:
@@ -36,8 +53,20 @@ def generate_ai_insight(
     openai_api_key: str | None = None,
     gemini_api_key: str | None = None,
 ) -> dict[str, str]:
+    """
+    Run özetini AI'a göndererek yorum üretir.
+
+    Args:
+        run_summary: Hotspot, trend, graph boyutu gibi run bilgilerini içeren sözlük
+        openai_api_key: OpenAI API anahtarı (opsiyonel)
+        gemini_api_key: Google Gemini API anahtarı (opsiyonel)
+
+    Returns:
+        {"provider": "openai|gemini|rule-based", "insight": "yorum metni"}
+    """
     prompt = _build_prompt(run_summary)
 
+    # OpenAI varsa öncelikli kullan
     if openai_api_key:
         response = requests.post(
             "https://api.openai.com/v1/chat/completions",
@@ -56,6 +85,7 @@ def generate_ai_insight(
         text = response.json()["choices"][0]["message"]["content"]
         return {"provider": "openai", "insight": text.strip()}
 
+    # OpenAI yoksa Gemini'yi dene
     if gemini_api_key:
         response = requests.post(
             "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent",
@@ -69,4 +99,5 @@ def generate_ai_insight(
         text = body["candidates"][0]["content"]["parts"][0]["text"]
         return {"provider": "gemini", "insight": text.strip()}
 
+    # Hiçbir API anahtarı yoksa kural tabanlı fallback
     return {"provider": "rule-based", "insight": _fallback_insight(run_summary)}
