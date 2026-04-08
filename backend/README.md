@@ -33,7 +33,10 @@ Bu ilk surumda veri depolama `in-memory` tutuldu. Sonraki adimda Supabase tablol
 
 ## Omurga Dokumanlari
 - API sozlesmesi: `backend/docs/api_contract.md`
+- Parser AST sozlesmesi: `backend/docs/parser_ast_contract.md`
 - Sprint/checklist: `backend/docs/backend_execution_checklist.md`
+- Parser AST schema: `backend/contracts/parser_ast.schema.json`
 - Analiz cikti kontrati: `backend/contracts/analysis_result.schema.json`
+- Parser AST ornegi: `backend/contracts/examples/golden_parser_ast.json`
 - Supabase schema migration: `backend/supabase/migrations/0001_init_polymetric_schema.sql`
 - Supabase RLS migration: `backend/supabase/migrations/0002_enable_rls.sql`

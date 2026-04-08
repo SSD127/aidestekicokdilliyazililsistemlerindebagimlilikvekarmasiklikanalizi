@@ -1,0 +1,203 @@
+{
+  "schema_version": "1.0.0",
+  "parser_version": "tree-sitter:v0.25.2",
+  "grammar_version": "tree-sitter-python:v0.25.0",
+  "repository": {
+    "repo_url": "https://github.com/example/polymetric-sample",
+    "ref": "main",
+    "commit_hash": "a1b2c3d4e5f6",
+    "analyzed_at": "2026-04-08T10:30:00Z"
+  },
+  "files": [
+    {
+      "file_path": "app/main.py",
+      "language": "python",
+      "encoding": "utf-8",
+      "parser": "tree-sitter-python",
+      "summary": {
+        "loc_total": 42,
+        "loc_code": 33,
+        "function_count": 2,
+        "class_count": 0,
+        "branch_count": 3,
+        "loop_count": 1,
+        "import_count": 2
+      },
+      "imports": [
+        {
+          "kind": "import",
+          "module": "logging",
+          "imported_symbols": [],
+          "is_relative": false,
+          "resolved_path": null,
+          "raw_text": "import logging",
+          "location": {
+            "start_line": 1,
+            "start_col": 0,
+            "end_line": 1,
+            "end_col": 14
+          }
+        },
+        {
+          "kind": "from_import",
+          "module": "app.storage",
+          "imported_symbols": [
+            "store"
+          ],
+          "alias": null,
+          "is_relative": false,
+          "resolved_path": "app/storage.py",
+          "raw_text": "from app.storage import store",
+          "location": {
+            "start_line": 3,
+            "start_col": 0,
+            "end_line": 3,
+            "end_col": 29
+          }
+        }
+      ],
+      "functions": [
+        {
+          "name": "health",
+          "qualified_name": "health",
+          "kind": "function",
+          "visibility": "public",
+          "is_async": false,
+          "is_generator": false,
+          "return_type": "dict[str, str]",
+          "parameters": [],
+          "decorators": [],
+          "branch_count": 0,
+          "loop_count": 0,
+          "location": {
+            "start_line": 8,
+            "start_col": 0,
+            "end_line": 9,
+            "end_col": 33
+          },
+          "ast_node_id": "n3"
+        },
+        {
+          "name": "create_project",
+          "qualified_name": "create_project",
+          "kind": "function",
+          "visibility": "public",
+          "is_async": false,
+          "is_generator": false,
+          "return_type": "ProjectResponse",
+          "parameters": [
+            {
+              "name": "payload",
+              "type_hint": "ProjectCreateRequest",
+              "kind": "positional"
+            },
+            {
+              "name": "x_user_id",
+              "type_hint": "str | None",
+              "default_value": "None",
+              "kind": "keyword"
+            }
+          ],
+          "decorators": [
+            "@app.post(\"/api/projects\")"
+          ],
+          "branch_count": 2,
+          "loop_count": 0,
+          "location": {
+            "start_line": 12,
+            "start_col": 0,
+            "end_line": 20,
+            "end_col": 45
+          },
+          "ast_node_id": "n6"
+        }
+      ],
+      "classes": [],
+      "ast": {
+        "root_type": "module",
+        "nodes": [
+          {
+            "id": "n1",
+            "type": "module",
+            "parent_id": null,
+            "named": true,
+            "location": {
+              "start_line": 1,
+              "start_col": 0,
+              "end_line": 20,
+              "end_col": 45
+            }
+          },
+          {
+            "id": "n2",
+            "type": "import_statement",
+            "parent_id": "n1",
+            "named": true,
+            "text": "import logging",
+            "location": {
+              "start_line": 1,
+              "start_col": 0,
+              "end_line": 1,
+              "end_col": 14
+            }
+          },
+          {
+            "id": "n3",
+            "type": "function_definition",
+            "parent_id": "n1",
+            "named": true,
+            "field_name": "body",
+            "text": "def health(): ...",
+            "location": {
+              "start_line": 8,
+              "start_col": 0,
+              "end_line": 9,
+              "end_col": 33
+            }
+          },
+          {
+            "id": "n4",
+            "type": "identifier",
+            "parent_id": "n3",
+            "named": true,
+            "field_name": "name",
+            "text": "health",
+            "location": {
+              "start_line": 8,
+              "start_col": 4,
+              "end_line": 8,
+              "end_col": 10
+            }
+          },
+          {
+            "id": "n5",
+            "type": "decorated_definition",
+            "parent_id": "n1",
+            "named": true,
+            "text": "@app.post(\"/api/projects\")",
+            "location": {
+              "start_line": 11,
+              "start_col": 0,
+              "end_line": 11,
+              "end_col": 26
+            }
+          },
+          {
+            "id": "n6",
+            "type": "function_definition",
+            "parent_id": "n5",
+            "named": true,
+            "field_name": "definition",
+            "text": "def create_project(...): ...",
+            "location": {
+              "start_line": 12,
+              "start_col": 0,
+              "end_line": 20,
+              "end_col": 45
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

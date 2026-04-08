@@ -1,0 +1,438 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://polymetric.local/contracts/parser_ast.schema.json",
+  "title": "PolyMetricParserAstPayload",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "parser_version",
+    "repository",
+    "files"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "const": "1.0.0"
+    },
+    "parser_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "grammar_version": {
+      "type": "string"
+    },
+    "repository": {
+      "type": "object",
+      "required": [
+        "repo_url",
+        "ref",
+        "analyzed_at"
+      ],
+      "properties": {
+        "repo_url": {
+          "type": "string",
+          "format": "uri"
+        },
+        "ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "commit_hash": {
+          "type": "string"
+        },
+        "analyzed_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "additionalProperties": false
+    },
+    "files": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/ParsedFile"
+      }
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "Location": {
+      "type": "object",
+      "required": [
+        "start_line",
+        "start_col",
+        "end_line",
+        "end_col"
+      ],
+      "properties": {
+        "start_line": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "start_col": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "end_line": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "end_col": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false
+    },
+    "ImportEntry": {
+      "type": "object",
+      "required": [
+        "kind",
+        "module",
+        "location"
+      ],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "import",
+            "from_import",
+            "include",
+            "require",
+            "using"
+          ]
+        },
+        "module": {
+          "type": "string",
+          "minLength": 1
+        },
+        "imported_symbols": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "alias": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "is_relative": {
+          "type": "boolean"
+        },
+        "resolved_path": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "raw_text": {
+          "type": "string"
+        },
+        "location": {
+          "$ref": "#/$defs/Location"
+        }
+      },
+      "additionalProperties": false
+    },
+    "Parameter": {
+      "type": "object",
+      "required": [
+        "name"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "type_hint": {
+          "type": "string"
+        },
+        "default_value": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "positional",
+            "keyword",
+            "vararg",
+            "kwarg",
+            "self",
+            "cls"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "FunctionEntry": {
+      "type": "object",
+      "required": [
+        "name",
+        "qualified_name",
+        "kind",
+        "location",
+        "branch_count",
+        "loop_count",
+        "parameters"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "qualified_name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "function",
+            "method",
+            "constructor",
+            "lambda"
+          ]
+        },
+        "visibility": {
+          "type": "string",
+          "enum": [
+            "public",
+            "protected",
+            "private",
+            "internal",
+            "unknown"
+          ]
+        },
+        "is_async": {
+          "type": "boolean"
+        },
+        "is_generator": {
+          "type": "boolean"
+        },
+        "return_type": {
+          "type": "string"
+        },
+        "parameters": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Parameter"
+          }
+        },
+        "decorators": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "branch_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "loop_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "location": {
+          "$ref": "#/$defs/Location"
+        },
+        "ast_node_id": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "ClassEntry": {
+      "type": "object",
+      "required": [
+        "name",
+        "qualified_name",
+        "location",
+        "methods"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "qualified_name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "base_classes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "methods": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "location": {
+          "$ref": "#/$defs/Location"
+        },
+        "ast_node_id": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "AstNode": {
+      "type": "object",
+      "required": [
+        "id",
+        "type",
+        "location"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "type": {
+          "type": "string",
+          "minLength": 1
+        },
+        "parent_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "field_name": {
+          "type": "string"
+        },
+        "named": {
+          "type": "boolean"
+        },
+        "text": {
+          "type": "string"
+        },
+        "location": {
+          "$ref": "#/$defs/Location"
+        }
+      },
+      "additionalProperties": false
+    },
+    "FileSummary": {
+      "type": "object",
+      "required": [
+        "loc_total",
+        "loc_code",
+        "function_count",
+        "class_count",
+        "branch_count",
+        "loop_count",
+        "import_count"
+      ],
+      "properties": {
+        "loc_total": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "loc_code": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "function_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "class_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "branch_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "loop_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "import_count": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false
+    },
+    "ParsedFile": {
+      "type": "object",
+      "required": [
+        "file_path",
+        "language",
+        "summary",
+        "imports",
+        "functions",
+        "classes",
+        "ast"
+      ],
+      "properties": {
+        "file_path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "language": {
+          "type": "string",
+          "minLength": 1
+        },
+        "encoding": {
+          "type": "string"
+        },
+        "parser": {
+          "type": "string"
+        },
+        "summary": {
+          "$ref": "#/$defs/FileSummary"
+        },
+        "imports": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ImportEntry"
+          }
+        },
+        "functions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/FunctionEntry"
+          }
+        },
+        "classes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ClassEntry"
+          }
+        },
+        "ast": {
+          "type": "object",
+          "required": [
+            "root_type",
+            "nodes"
+          ],
+          "properties": {
+            "root_type": {
+              "type": "string",
+              "minLength": 1
+            },
+            "nodes": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/AstNode"
+              }
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}
