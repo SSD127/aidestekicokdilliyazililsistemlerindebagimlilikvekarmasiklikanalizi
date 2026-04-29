@@ -12,7 +12,10 @@
   "properties": {
     "schema_version": {
       "type": "string",
-      "const": "1.0.0"
+      "enum": [
+        "1.0.0",
+        "1.1.0"
+      ]
     },
     "parser_version": {
       "type": "string",
@@ -235,6 +238,36 @@
         "loop_count": {
           "type": "integer",
           "minimum": 0
+        },
+        "return_count": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Fonksiyon govdesindeki return ifadelerinin toplam sayisi. ICC hesabinda kullanilir."
+        },
+        "executable_lines": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Fonksiyon govdesindeki yorum/bos satirlar haric calistirilabilir kod satiri sayisi."
+        },
+        "unique_operators": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Halstead n1: fonksiyonda kullanilan farkli operator turu sayisi."
+        },
+        "total_operators": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Halstead N1: fonksiyondaki toplam operator gecisi sayisi."
+        },
+        "unique_operands": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Halstead n2: fonksiyonda kullanilan farkli operand sayisi."
+        },
+        "total_operands": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Halstead N2: fonksiyondaki toplam operand gecisi sayisi."
         },
         "location": {
           "$ref": "#/$defs/Location"
