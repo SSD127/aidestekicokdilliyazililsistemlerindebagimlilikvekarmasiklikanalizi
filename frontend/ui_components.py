@@ -3,6 +3,8 @@ Frontend UI Components
 Reusable UI elements for the application
 """
 
+import os
+
 import streamlit as st
 
 
@@ -54,8 +56,10 @@ def render_sidebar():
 
         st.divider()
 
-        st.markdown("### ℹ️ Demo Mode")
-        st.info("This is a demo application that generates realistic mock data for visualization purposes.")
+        st.markdown("### ℹ️ Backend")
+        backend_url = os.getenv("POLYMETRIC_API", "http://localhost:8000")
+        st.caption(f"API: `{backend_url}`")
+        st.caption("Tek istek/tek yanıt: `POST /api/analyze`")
 
     return analyze_button and github_url
 
@@ -115,8 +119,8 @@ def render_footer():
     st.divider()
     st.markdown("""
         <div style='text-align: center; color: #6b7280; padding: 2rem;'>
-            <p>Software Complexity Analysis Platform v1.0 | Built with Streamlit & Python</p>
-            <p>Demo application with mock data for visualization purposes</p>
+            <p>Software Complexity Analysis Platform v1.0 | Built with Streamlit & FastAPI</p>
+            <p>Tree-sitter parser · McCabe Cyclomatic Complexity · Halstead Effort</p>
         </div>
     """, unsafe_allow_html=True)
 
@@ -140,15 +144,22 @@ def render_metric_cards(metrics_data):
 
 def get_complexity_rating(score):
     """
-    Get a visual rating for complexity score
+    McCabe Cyclomatic Complexity skoru için görsel etiket döndürür.
+    Eşikler dosya/fonksiyon başına CC toplamı ile uyumludur.
+
     Args:
-        score: Complexity score (0-100)
+        score: McCabe Cyclomatic Complexity (1+karar noktaları)
     Returns:
-        str: Emoji and text rating
+        str: Emoji ve metin etiketi
     """
-    if score < 30:
+    try:
+        value = float(score)
+    except (TypeError, ValueError):
+        return "—"
+    if value <= 5:
         return "🟢 Low"
-    elif score < 60:
-        return "🟡 Medium"
-    else:
-        return "🔴 High"
+    if value <= 10:
+        return "🟡 Moderate"
+    if value <= 20:
+        return "🟠 High"
+    return "🔴 Critical"

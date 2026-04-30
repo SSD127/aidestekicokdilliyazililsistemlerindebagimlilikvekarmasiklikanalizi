@@ -1,38 +1,39 @@
 """
 risk.py — Fonksiyon Risk Seviyesi Hesaplama
 
-Bu dosya cyclomatic complexity ve Halstead skorunu birleştirerek
-bir fonksiyon için risk seviyesi (low/moderate/high/critical) üretir.
+Cyclomatic complexity ve Halstead Effort skorunu birleştirerek bir fonksiyon
+için risk seviyesi (low/moderate/high/critical) üretir.
+
+Risk skoru formülü:
+    score = cyclomatic_complexity + halstead_effort / 1000
+
+Halstead Effort tipik olarak küçük fonksiyonlarda 100-1000, orta fonksiyonlarda
+1000-10000, çok karmaşık fonksiyonlarda 10000+ aralığına çıkar. 1000'e bölme
+Effort'un katkısını CC ile aynı mertebede tutar.
 
 Risk seviyeleri:
   - low      : Skor < 8    → Düşük risk, normal fonksiyon
   - moderate : Skor 8-14   → Orta risk, gözlem altında tutulmalı
   - high     : Skor 15-24  → Yüksek risk, refactor önerilir
   - critical : Skor >= 25  → Kritik, acil müdahale gerekir
-
-Gerçek metrik motoru (McCabe/Halstead) entegre edildiğinde
-eşik değerleri bu dosyadan kalibre edilecektir.
 """
 
 from typing import Literal
 
-# Risk seviyesi için tip tanımı
 RiskLevel = Literal["low", "moderate", "high", "critical"]
+
+# Halstead Effort katkısı için bölücü; Effort/HALSTEAD_DIVISOR puana eklenir
+HALSTEAD_DIVISOR = 1000.0
+# Halstead katkısı için üst sınır — çok büyük dosyalarda CC'yi tamamen ezmesin
+HALSTEAD_MAX_CONTRIBUTION = 50.0
 
 
 def calculate_risk_level(cyclomatic_complexity: int, halstead_score: float = 0.0) -> RiskLevel:
     """
-    Cyclomatic complexity ve Halstead skorundan ağırlıklı risk seviyesi hesaplar.
-
-    Args:
-        cyclomatic_complexity: McCabe karmaşıklık değeri (>=0)
-        halstead_score: Halstead effort skoru (opsiyonel, varsayılan 0)
-
-    Returns:
-        RiskLevel: "low" | "moderate" | "high" | "critical"
+    Cyclomatic complexity ve Halstead Effort skorundan risk seviyesi hesaplar.
     """
-    # Halstead skoru 100'de 1 ağırlıkla toplam skora eklenir
-    score = cyclomatic_complexity + (halstead_score / 100)
+    halstead_part = min(halstead_score / HALSTEAD_DIVISOR, HALSTEAD_MAX_CONTRIBUTION)
+    score = cyclomatic_complexity + halstead_part
 
     if score >= 25:
         return "critical"

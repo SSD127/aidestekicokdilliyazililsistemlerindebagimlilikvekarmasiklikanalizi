@@ -47,6 +47,19 @@ class RunCreateRequest(BaseModel):
     github_ref: str | None = None
 
 
+class AnalyzeRequest(BaseModel):
+    """
+    POST /api/analyze sarmalayıcı endpoint'inin request gövdesi.
+    Frontend tek seferde GitHub URL gönderir, backend senkron analiz yapıp
+    AnalysisResult döndürür.
+    """
+    github_url: HttpUrl
+    branch: str = "main"
+    # include_tests şimdilik kabul edilir ama yok sayılır; gelecekte test dosyalarını
+    # filtrelemek için kullanılacak
+    include_tests: bool = True
+
+
 class RunResponse(BaseModel):
     # Analiz run'ının mevcut durumunu ve meta bilgilerini döndürür
     id: UUID
