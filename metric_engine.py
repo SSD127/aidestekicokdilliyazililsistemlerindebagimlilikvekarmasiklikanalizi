@@ -1,30 +1,26 @@
 import numpy as np
-import json
 
 class ComplexityAnalyzer:
     def __init__(self, function_payload):
         """
-        Salih'in Parser AST Schema'sındaki 'FunctionEntry' objesini içeri alır.
+        Salih'in v1.1.0 Parser sözleşmesinden gelen veriyi alır.
         """
-        self.veri = function_payload
+        self.veri = function_payload if isinstance(function_payload, dict) else {}
 
     def hesapla_mccabe(self):
         """
-        Şemadaki branch ve loop verilerini kullanarak anında hesaplama yapar (O(1) Performans).
-        Formül: Karar Yolları + Döngüler + 1
+        M = Branch + Loop + 1
         """
-        branch_sayisi = self.veri.get("branch_count", 0)
-        loop_sayisi = self.veri.get("loop_count", 0)
-        
-        return branch_sayisi + loop_sayisi + 1
+        return self.veri.get("branch_count", 0) + self.veri.get("loop_count", 0) + 1
 
     def hesapla_halstead(self):
         """
-        Halstead Metrikleri. (Salih'ten talep edilen güncel veriler eklendiğinde tam uyumlu çalışacak)
+        Salih'in yeni eklediği Halstead alanlarını kullanır.
         """
+        # Salih'in v1.1.0 ile gönderdiği gerçek anahtarlar:
         n1 = self.veri.get("unique_operators", 0)
-        n2 = self.veri.get("unique_operands", 0)
         N1 = self.veri.get("total_operators", 0)
+        n2 = self.veri.get("unique_operands", 0)
         N2 = self.veri.get("total_operands", 0)
 
         n = n1 + n2
@@ -45,12 +41,14 @@ class ComplexityAnalyzer:
 
     def hesapla_icc(self, loc_total):
         """
-        IEEE 2024 Makalesi: Geliştirilmiş Siklomatik Karmaşıklık (Karmaşıklık Yoğunluğu)
+        IEEE 2024 ICC: Salih'in yeni return_count ve executable_lines verilerini işler.
         """
-        f = 1 # Bu fonksiyon bazlı bir analiz olduğu için fonksiyon sayısı 1
-        i = len(self.veri.get("parameters", [])) # Girdi sayısı (Parametre listesinin uzunluğu)
-        o = self.veri.get("return_count", 1)     # Çıktı sayısı
-        S_x = self.veri.get("executable_lines", 0) # Çalışan satır sayısı
+        f = 1  # Fonksiyonun kendisi
+        i = len(self.veri.get("parameters", []))
+        
+        # Salih'in v1.1.0 ile eklediği yeni ICC alanları:
+        o = self.veri.get("return_count", 1)
+        S_x = self.veri.get("executable_lines", 0)
         
         if loc_total <= 0:
             return 0.0
@@ -60,12 +58,14 @@ class ComplexityAnalyzer:
 
     def hesapla_risk_skoru(self, mccabe, halstead_efor):
         """
-        Literatüre dayalı risk ağırlıklandırması (Maksimum 100).
+        Karmaşıklık ve Efor limitlerine göre 100 üzerinden risk puanı.
         """
         risk = 0.0
+        # McCabe limitleri (Literatür: 10 ve 20)
         if mccabe > 20: risk += 50.0
         elif mccabe > 10: risk += 25.0
             
+        # Halstead Efor limitleri (Literatür: 5000 ve 10000)
         if halstead_efor > 10000: risk += 50.0
         elif halstead_efor > 5000: risk += 25.0
             
@@ -73,7 +73,7 @@ class ComplexityAnalyzer:
 
     def analiz_raporu_uret(self, dosya_loc_degeri=100):
         """
-        Çağrı'nın veritabanına ('functions' dizisine) gidecek nihai JSON formatını üretir.
+        Tüm metrikleri birleştirip nihai JSON raporunu oluşturur.
         """
         mccabe_sonuc = self.hesapla_mccabe()
         halstead_sonuc = self.hesapla_halstead()
@@ -81,35 +81,9 @@ class ComplexityAnalyzer:
         risk_sonuc = self.hesapla_risk_skoru(mccabe_sonuc, halstead_sonuc["Efor"])
 
         return {
-            "function_name": self.veri.get("name", "unknown_function"),
+            "function_name": self.veri.get("name", "unknown"),
             "cyclomatic_complexity": int(mccabe_sonuc),
             "halstead_score": float(halstead_sonuc["Efor"]),
             "icc_density": float(icc_sonuc),
             "risk_score": float(risk_sonuc)
         }
-
-
-# ==========================================
-# GITHUB İÇİN TEST (MOCK) ÇALIŞTIRMASI
-# ==========================================
-ornek_function_entry = {
-    # Şemadan gelen kesin veriler
-    "name": "create_run",
-    "branch_count": 8,
-    "loop_count": 4,
-    "parameters": [{"name": "project_id"}, {"name": "config"}], # 2 Parametre
-    
-    # Salih'ten istediğimiz yeni veriler (Mock)
-    "unique_operators": 14,
-    "unique_operands": 10,
-    "total_operators": 55,
-    "total_operands": 40,
-    "return_count": 2,
-    "executable_lines": 28
-}
-
-motor = ComplexityAnalyzer(ornek_function_entry)
-# Dosya genelinde 120 satır kod olduğunu varsayarak rapor üretiyoruz:
-sonuc = motor.analiz_raporu_uret(dosya_loc_degeri=120)
-
-print(json.dumps(sonuc, indent=2, ensure_ascii=False))
