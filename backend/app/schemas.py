@@ -140,6 +140,7 @@ class FunctionMetric(BaseModel):
     start_line: int = Field(ge=1, default=1)
     end_line: int = Field(ge=1, default=1)
     risk_score: float = Field(ge=0.0, default=0.0)
+    icc_density: float | None = None
 
 
 class DependencyEntry(BaseModel):

@@ -51,10 +51,11 @@ def build_function_entry(
     loc: int,
     start_line: int = 1,
     end_line: int = 1,
+    risk_score: float = 0.0,
+    icc_density: float | None = None,
 ) -> dict:
     # Tek bir fonksiyon için metrik kaydı oluşturur
-    # Risk seviyesini otomatik hesaplayıp sayısal skora çevirir
-    risk = calculate_risk_level(cyclomatic_complexity, halstead_score)
+    # Risk skoru ve icc_density değerleri metric_engine üzerinden gelir.
     return {
         "file_path": file_path,
         "function_name": function_name,
@@ -63,7 +64,8 @@ def build_function_entry(
         "loc": loc,
         "start_line": start_line,
         "end_line": end_line,
-        "risk_score": RISK_SCORE_MAP[risk],
+        "risk_score": risk_score,
+        "icc_density": icc_density,
     }
 
 

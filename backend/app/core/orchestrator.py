@@ -75,14 +75,29 @@ def run_metrics(parsed_files: list[dict]) -> tuple[list[dict], list[dict]]:
             # Dosyanın toplam karmaşıklığına (WMC) bu fonksiyonun skorunu ekle
             dosya_toplam_karmasiklik += fonk_rapor["cyclomatic_complexity"]
 
+            # Fonksiyon lokasyon verilerini ayıkla
+            loc_data = func_data.get("location", {})
+            start_line = loc_data.get("start_line", 1)
+            end_line = loc_data.get("end_line", 1)
+            func_loc = max(1, end_line - start_line + 1)
+
             # Fonksiyon karnesini listeye ekle
             function_metrics.append(build_function_entry(
                 file_path=path,
                 function_name=fonk_rapor["function_name"],
                 cyclomatic_complexity=fonk_rapor["cyclomatic_complexity"],
                 halstead_score=fonk_rapor["halstead_score"],
-                loc=dosya_loc,
+                loc=func_loc,
+                start_line=start_line,
+                end_line=end_line,
+                risk_score=fonk_rapor["risk_score"],
+                icc_density=fonk_rapor["icc_density"],
             ))
+
+        # Dosya için basit bir Maintainability Index hesaplama (0-100 arası)
+        # Karmaşıklık ve LOC arttıkça puan düşer
+        raw_mi = 100.0 - (dosya_toplam_karmasiklik * 0.5) - (dosya_loc / 10.0)
+        maintainability_index = max(0.0, min(100.0, round(raw_mi, 2)))
 
         # Dosya düzeyindeki karneleri listeye ekle
         file_metrics.append(build_file_entry(
@@ -91,6 +106,7 @@ def run_metrics(parsed_files: list[dict]) -> tuple[list[dict], list[dict]]:
             loc=dosya_loc,
             complexity_score=float(dosya_toplam_karmasiklik),
             dependency_count=summary.get("import_count", 0),
+            maintainability_index=maintainability_index,
         ))
 
     return file_metrics, function_metrics

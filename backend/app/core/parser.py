@@ -115,28 +115,54 @@ def _location(node: Any) -> dict:
     }
 
 
-def _walk_for_halstead(node: Any, counts: _HalsteadCounts) -> None:
-    # Yorumlari ve docstring'leri sayma kapsami disinda tut
-    if node.type == "comment":
-        return
-
-    # Operandler: atomik kod birimleri (identifier, sayi, string vs.)
-    if node.type in _PYTHON_OPERAND_TYPES:
-        text = _node_text(node)
-        counts.operands_total += 1
-        counts.operands_unique.add(text)
-        return
-
-    # Operatorler: punctuation ve keyword token'lari (unnamed leaf node'lar)
-    if not node.is_named and node.child_count == 0:
-        text = _node_text(node).strip()
-        if text:
-            counts.operators_total += 1
-            counts.operators_unique.add(text)
-        return
-
-    for child in node.children:
-        _walk_for_halstead(child, counts)
+def _walk_for_halstead(start_node: Any, counts: _HalsteadCounts) -> None:
+    cursor = start_node.walk()
+    depth = 0
+    
+    while True:
+        node = cursor.node
+        
+        # Yorumlari sayma kapsami disinda tut
+        if node.type != "comment":
+            # Operandler: atomik kod birimleri (identifier, sayi, string vs.)
+            if node.type in _PYTHON_OPERAND_TYPES:
+                text = _node_text(node)
+                counts.operands_total += 1
+                counts.operands_unique.add(text)
+            # Operatorler: punctuation ve keyword token'lari (unnamed leaf node'lar)
+            elif not node.is_named and node.child_count == 0:
+                text = _node_text(node).strip()
+                if text:
+                    counts.operators_total += 1
+                    counts.operators_unique.add(text)
+        
+        # Operand veya yorum degilse alt dallara (children) inmeye calis
+        # Inerse derinligi artir
+        if node.type not in _PYTHON_OPERAND_TYPES and node.type != "comment":
+            if cursor.goto_first_child():
+                depth += 1
+                continue
+                
+        # Alta inemediysek kardese (sibling) gecmeye calis
+        # KRITIK: depth == 0 ise (kok dugum), kardese asla gecme! (Scope Leakage onlemi)
+        if depth > 0 and cursor.goto_next_sibling():
+            continue
+            
+        # Hem alta hem kardese gidilemediyse, yeni bir kardes bulana kadar parent'a cik
+        went_up = False
+        while depth > 0:
+            if cursor.goto_parent():
+                depth -= 1
+                # Parent'a ciktiktan sonra hala hedef agacin icindeysek kardese gec
+                if depth > 0 and cursor.goto_next_sibling():
+                    went_up = True
+                    break
+            else:
+                break
+                
+        # Eger parent'a cikip yeni kardes bulamadiysak (veya depth 0 olduysa), gezinme bitti
+        if not went_up:
+            break
 
 
 def _count_branches_loops_returns(node: Any) -> tuple[int, int, int]:
@@ -168,9 +194,22 @@ def _count_executable_lines(content: str, start_line: int, end_line: int) -> int
 
 def _function_name(node: Any) -> str:
     name_node = node.child_by_field_name("name")
-    if name_node is None:
-        return "<lambda>"
-    return _node_text(name_node)
+    base_name = _node_text(name_node) if name_node is not None else "<lambda>"
+    
+    # Ebeveynlere çıkarak sınıf isimlerini bul (örneğin ClassName.method_name için)
+    curr = node.parent
+    class_names = []
+    while curr:
+        if curr.type == "class_definition":
+            cls_name_node = curr.child_by_field_name("name")
+            if cls_name_node:
+                class_names.append(_node_text(cls_name_node))
+        curr = curr.parent
+        
+    if class_names:
+        # Sınıf isimleri (inner_class, outer_class) sırasıyla gelir, ters çeviriyoruz
+        return ".".join(reversed(class_names)) + "." + base_name
+    return base_name
 
 
 def _parameters(node: Any) -> list[dict]:
