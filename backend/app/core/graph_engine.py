@@ -1,43 +1,15 @@
 """
 graph_engine.py — Bağımlılık Haritalama ve Grafik Analiz Motoru
 
-Bu modül, dosyalar arasındaki içe aktarma (import) ilişkilerini analiz ederek
-yönlü bir grafik (Directed Graph) yapısına dönüştürür. Döngüsel bağımlılıkları
-tespit eder ve mimari metrikleri hesaplar.
-
-GÖREV: Bağımlılık Haritalama ve Grafik Sorumlusu (Network Analysis)
-
-Kullanılan Kütüphane:
-    - NetworkX: Grafik veri yapısı ve algoritmaları için kullanılan Python kütüphanesi.
-      Yönlü grafik (DiGraph), döngü tespiti (simple_cycles), yoğunluk (density),
-      güçlü bağlı bileşenler (SCC) gibi fonksiyonlar bu kütüphaneden gelir.
 """
 
-# ─────────────────────────────────────────────
-# Gerekli kütüphanelerin içe aktarılması
-# ─────────────────────────────────────────────
 import networkx as nx                               # Grafik veri yapısı ve algoritmaları (yönlü grafik, döngü tespiti vb.)
 from typing import List, Dict, Set, Tuple, Optional  # Python tip belirtme araçları (kodun okunabilirliği için)
 from dataclasses import dataclass, field             # Veri sınıfı tanımlama aracı (otomatik __init__, __repr__ üretir)
 
-
-# ─────────────────────────────────────────────────────────────────
-# VERİ MODELİ 1: CycleInfo
-# Bir döngüsel bağımlılık zincirini temsil eden veri sınıfı.
-# Örnek: A → B → C → A şeklinde bir döngü varsa,
-#         nodes = ["A", "B", "C"], length = 3, chain = "A → B → C → A"
-# ─────────────────────────────────────────────────────────────────
 @dataclass
 class CycleInfo:
     """Bir döngüsel bağımlılık zincirinin temsili.
-
-    Döngüsel bağımlılık (circular dependency), iki veya daha fazla dosyanın
-    birbirini karşılıklı olarak import etmesidir. Bu durum yazılım mimarisinde
-    "spagetti kod" olarak adlandırılır ve bakım zorluğuna yol açar.
-
-    Attributes:
-        nodes: Döngüye dahil olan dosya/modül adlarının listesi.
-        length: Döngüdeki eleman sayısı (otomatik hesaplanır).
     """
     nodes: List[str]     # Döngüdeki düğüm (dosya) isimlerinin listesi
     length: int = 0      # Döngünün uzunluğu (kaç dosya dahil)
@@ -48,18 +20,11 @@ class CycleInfo:
 
     @property
     def chain(self) -> str:
-        """Döngüyü insan tarafından okunabilir zincir formatında döndürür.
-
-        Örnek çıktı: "app.py → utils.py → config.py → app.py"
-        Bu format, döngünün başladığı dosyaya geri döndüğünü gösterir.
+        """Döngüyü insan tarafından okunabilir zincir formatında döndürür
         """
         return " → ".join(self.nodes) + f" → {self.nodes[0]}"
 
     def to_dict(self) -> dict:
-        """Döngü bilgisini JSON'a çevrilebilir sözlük formatına dönüştürür.
-
-        Bu metot, API üzerinden frontend'e veri gönderilirken kullanılır.
-        """
         return {
             "nodes": self.nodes,       # Döngüdeki dosyalar
             "length": self.length,     # Döngü uzunluğu
@@ -67,29 +32,9 @@ class CycleInfo:
         }
 
 
-# ─────────────────────────────────────────────────────────────────
-# VERİ MODELİ 2: GraphMetrics
-# Bağımlılık grafiğinin mimari metriklerini tutan veri sınıfı.
-# Bu metrikler projenin mimari sağlığını ölçmek için kullanılır.
-# ─────────────────────────────────────────────────────────────────
 @dataclass
 class GraphMetrics:
     """Bağımlılık grafiğinin mimari metrikleri.
-
-    Bu metrikler projenin ne kadar karmaşık ve bakımı zor olduğunu gösterir.
-    Dashboard'da "Network Analysis" sekmesinde görüntülenir.
-
-    Attributes:
-        total_nodes: Grafikteki toplam düğüm sayısı (dosya + dış kütüphane).
-        total_edges: Grafikteki toplam kenar sayısı (import bağlantıları).
-        total_cycles: Tespit edilen döngüsel bağımlılık sayısı.
-        density: Grafik yoğunluğu (0-1 arası). 1'e yakınsa çok fazla bağlantı var demek.
-        avg_in_degree: Ortalama gelen bağlantı sayısı (bir dosyanın ortalama kaç dosya tarafından import edildiği).
-        avg_out_degree: Ortalama giden bağlantı sayısı (bir dosyanın ortalama kaç dosyayı import ettiği).
-        max_in_degree: En çok import edilen dosya ve import sayısı.
-        max_out_degree: En çok import yapan dosya ve import sayısı.
-        strongly_connected_components: Güçlü bağlı bileşen sayısı (karşılıklı erişilebilir düğüm grupları).
-        instability_scores: Her dosya için kararsızlık skoru (Robert C. Martin formülü).
     """
     total_nodes: int = 0                                    # Toplam düğüm (dosya) sayısı
     total_edges: int = 0                                    # Toplam kenar (import bağlantısı) sayısı
@@ -103,11 +48,6 @@ class GraphMetrics:
     instability_scores: Dict[str, float] = field(default_factory=dict)  # Dosya bazlı kararsızlık skorları
 
     def to_dict(self) -> dict:
-        """Metrikleri JSON'a çevrilebilir sözlük formatına dönüştürür.
-
-        Bu metot, API üzerinden frontend'e veri gönderilirken kullanılır.
-        round() ile ondalık sayılar yuvarlanarak okunabilirlik artırılır.
-        """
         return {
             "total_nodes": self.total_nodes,
             "total_edges": self.total_edges,
@@ -128,19 +68,6 @@ class GraphMetrics:
 # Bu sınıf tüm Network Analysis işlemlerinin merkezidir.
 # ─────────────────────────────────────────────────────────────────
 class GraphAnalyzer:
-    """Bağımlılık ilişkilerini modelleyen ve analiz eden sınıf.
-
-    Bu sınıf 3 temel işlem yapar:
-        1. build_graph()          → Parser çıktılarından yönlü grafik (DiGraph) oluşturur
-        2. find_cycles()          → Grafikteki döngüsel bağımlılıkları tespit eder
-        3. calculate_metrics()    → Grafik üzerinden mimari metrikleri hesaplar
-        4. get_serializable_data() → Tüm sonuçları API/dashboard için JSON formatında döndürür
-
-    Kullanım:
-        >>> analyzer = GraphAnalyzer()
-        >>> analyzer.build_graph(parsed_files)       # Grafiği oluştur
-        >>> data = analyzer.get_serializable_data()  # Sonuçları al
-    """
 
     def __init__(self):
         """GraphAnalyzer nesnesini başlatır.
@@ -152,32 +79,13 @@ class GraphAnalyzer:
         self._graph: nx.DiGraph = nx.DiGraph()      # Boş bir yönlü grafik oluştur
         self._project_files: Set[str] = set()        # Proje dosyalarını tutacak küme
 
-    # ─────────────────────────────────────────
-    # ADIM 1: Grafik Oluşturma
-    # Parser'dan gelen dosya bilgilerinden
-    # düğüm (node) ve kenar (edge) oluşturur.
-    # ─────────────────────────────────────────
+   
     def build_graph(self, parsed_files: List[dict]):
         """Parser (Tree-sitter) çıktılarından bağımlılık grafiğini oluşturur.
-
-        Her dosya bir düğüm (node) olarak eklenir.
-        Her import ilişkisi bir kenar (edge) olarak eklenir.
-        Yön: kaynak dosya → import edilen dosya şeklindedir.
-
-        Args:
-            parsed_files: Parser'ın ürettiği dosya analiz sonuçları listesi.
-                Her eleman şu yapıdadır:
-                {
-                    "file_path": "app/main.py",
-                    "language": "python",
-                    "imports": [{"module": "app.storage", ...}, ...]
-                }
-        """
         # Önceki analiz verilerini temizle (yeni analiz için)
         self._graph.clear()
 
         # Proje dosyalarının listesini oluştur
-        # Bu liste, bir import'un proje içi mi yoksa dış kütüphane mi olduğunu belirlemek için kullanılır
         self._project_files = {pf["file_path"] for pf in parsed_files}
 
         # Her dosyayı düğüm olarak ekle ve import ilişkilerini kenar olarak oluştur
@@ -185,7 +93,6 @@ class GraphAnalyzer:
             source = pf["file_path"]   # Kaynak dosya (import yapan dosya)
 
             # Kaynak dosyayı grafiğe düğüm olarak ekle
-            # type="project" → bu dosya projenin bir parçası (dış kütüphane değil)
             self._graph.add_node(source, type="project", language=pf.get("language", "unknown"))
 
             # Bu dosyanın tüm import'larını tara
@@ -219,13 +126,6 @@ class GraphAnalyzer:
     # ─────────────────────────────────────────
     def find_cycles(self) -> List[CycleInfo]:
         """Grafikteki tüm döngüsel bağımlılıkları (circular dependencies) tespit eder.
-
-        NetworkX'in simple_cycles() fonksiyonunu kullanır.
-        Bu fonksiyon Tarjan/DFS (Derinlik Öncelikli Arama) algoritmasını temel alır.
-
-        Returns:
-            CycleInfo nesnelerinin listesi. Her biri bir döngü zincirini temsil eder.
-            Döngü yoksa boş liste döner.
         """
         try:
             # NetworkX'in simple_cycles fonksiyonu ile tüm basit döngüleri bul
