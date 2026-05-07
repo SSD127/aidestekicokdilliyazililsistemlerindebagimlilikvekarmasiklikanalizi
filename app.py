@@ -2,38 +2,44 @@
 Software Complexity Analysis Platform - Main Application
 FRONTEND ENTRY POINT
 
-This is the main Streamlit application file.
-Your backend teammates should provide real API endpoints that return
-data matching the structure in /backend_mock/mock_data.py
+Streamlit uygulaması; PolyMetric backend'inin POST /api/analyze sarmalayıcı
+endpoint'ine senkron istek atar ve dönen AnalysisResult JSON'unu dashboard
+bileşenlerine besler.
 """
 
-import streamlit as st
+import os
 import sys
 from pathlib import Path
 
-# Add frontend directory to path
-sys.path.append(str(Path(__file__).parent / "frontend"))
-sys.path.append(str(Path(__file__).parent / "backend_mock"))
+import requests
+import streamlit as st
 
-from frontend.ui_components import render_header, render_sidebar, render_welcome_screen, render_footer
-from frontend.dashboard import render_overview_tab, render_performance_tab, render_disk_space_tab, render_details_tab
-from backend_mock.mock_data import (
-    generate_complexity_data,
-    generate_performance_metrics,
-    generate_disk_space_data,
-    generate_code_analysis_data,
-    generate_file_metrics
+sys.path.append(str(Path(__file__).parent / "frontend"))
+
+from frontend.dashboard import (
+    render_details_tab,
+    render_hotspots_tab,
+    render_overview_tab,
+    render_performance_tab,
+    render_network_tab,
+)
+from frontend.ui_components import (
+    render_footer,
+    render_header,
+    render_sidebar,
+    render_welcome_screen,
 )
 
-# Page configuration
+BACKEND_URL = os.getenv("POLYMETRIC_API", "http://localhost:8000")
+ANALYZE_TIMEOUT_SECONDS = int(os.getenv("POLYMETRIC_ANALYZE_TIMEOUT", "300"))
+
 st.set_page_config(
     page_title="Software Complexity Analysis Platform",
     page_icon="📊",
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="expanded",
 )
 
-# Custom CSS
 st.markdown("""
     <style>
     .main-header {
@@ -58,63 +64,94 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# Initialize session state
 if 'analysis_data' not in st.session_state:
     st.session_state.analysis_data = None
 if 'github_url' not in st.session_state:
     st.session_state.github_url = ""
+if 'last_error' not in st.session_state:
+    st.session_state.last_error = None
 
-# Render header
 render_header()
 
-# Render sidebar and get analysis trigger
 analyze_triggered = render_sidebar()
 
-# Handle analysis
+
+def call_analyze_api(github_url: str, branch: str = "main") -> dict | None:
+    """Backend POST /api/analyze sarmalayıcısını çağırır; başarılıysa AnalysisResult dict döner."""
+    try:
+        resp = requests.post(
+            f"{BACKEND_URL}/api/analyze",
+            json={"github_url": github_url, "branch": branch},
+            timeout=ANALYZE_TIMEOUT_SECONDS,
+        )
+    except requests.exceptions.Timeout:
+        st.session_state.last_error = (
+            f"Backend cevap vermedi (timeout {ANALYZE_TIMEOUT_SECONDS}s). "
+            "Repo cok buyuk olabilir veya backend yavas."
+        )
+        return None
+    except requests.exceptions.ConnectionError as exc:
+        st.session_state.last_error = (
+            f"Backend'e baglanilamadi ({BACKEND_URL}). "
+            f"uvicorn ayakta mi? Detay: {exc}"
+        )
+        return None
+
+    if resp.status_code == 200:
+        st.session_state.last_error = None
+        return resp.json()
+
+    try:
+        detail = resp.json().get("detail", resp.text)
+    except ValueError:
+        detail = resp.text
+    st.session_state.last_error = f"Backend hata kodu {resp.status_code}: {detail}"
+    return None
+
+
 if analyze_triggered:
-    with st.spinner("Analyzing repository..."):
-        # TODO: Replace this with real API calls to your backend
-        # Example:
-        # response = requests.post('http://your-api.com/analyze', json={'url': st.session_state.github_url})
-        # st.session_state.analysis_data = response.json()
+    with st.spinner("Repo analiz ediliyor — clone, parse, metrik..."):
+        result = call_analyze_api(st.session_state.github_url, branch="main")
+        if result is not None:
+            st.session_state.analysis_data = result
+            st.success("Analiz tamamlandi.")
 
-        # For now, using mock data
-        st.session_state.analysis_data = {
-            'complexity': generate_complexity_data(),
-            'performance': generate_performance_metrics(),
-            'disk_space': generate_disk_space_data(),
-            'code_analysis': generate_code_analysis_data(),
-            'file_metrics': generate_file_metrics()
-        }
-        st.success("Analysis complete!")
+if st.session_state.last_error:
+    st.error(st.session_state.last_error)
 
-# Main content
 if st.session_state.analysis_data:
     data = st.session_state.analysis_data
 
-    # Display repository name
     repo_name = st.session_state.github_url.split('/')[-1] if st.session_state.github_url else "Repository"
-    st.markdown(f"### Analyzing: **{repo_name}**")
+    st.markdown(f"### Analiz: **{repo_name}**")
     st.markdown(f"**URL:** {st.session_state.github_url}")
+    st.markdown(
+        f"**Branch:** `{data.get('branch_name', 'main')}` · "
+        f"**Commit:** `{data.get('commit_hash', '?')}` · "
+        f"**Parser:** `{data.get('parser_version', '?')}`"
+    )
     st.divider()
 
-    # Create tabs
-    tab1, tab2, tab3, tab4 = st.tabs(["📊 Overview", "⚡ Performance", "💾 Disk Space", "📋 Details"])
+    tab1, tab2, tab3, tab4, tab5 = st.tabs([
+        "📊 Genel Bakış",
+        "⚡ Karmaşıklık Dağılımı",
+        "🔥 Hotspots",
+        "🕸️ Network Analysis",
+        "📋 Detaylar",
+    ])
 
     with tab1:
         render_overview_tab(data)
-
     with tab2:
         render_performance_tab(data)
-
     with tab3:
-        render_disk_space_tab(data)
-
+        render_hotspots_tab(data)
     with tab4:
+        render_network_tab(data)
+    with tab5:
         render_details_tab(data)
 
 else:
     render_welcome_screen()
 
-# Footer
 render_footer()

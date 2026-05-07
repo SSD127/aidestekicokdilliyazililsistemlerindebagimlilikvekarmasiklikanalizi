@@ -47,6 +47,19 @@ class RunCreateRequest(BaseModel):
     github_ref: str | None = None
 
 
+class AnalyzeRequest(BaseModel):
+    """
+    POST /api/analyze sarmalayıcı endpoint'inin request gövdesi.
+    Frontend tek seferde GitHub URL gönderir, backend senkron analiz yapıp
+    AnalysisResult döndürür.
+    """
+    github_url: HttpUrl
+    branch: str = "main"
+    # include_tests şimdilik kabul edilir ama yok sayılır; gelecekte test dosyalarını
+    # filtrelemek için kullanılacak
+    include_tests: bool = True
+
+
 class RunResponse(BaseModel):
     # Analiz run'ının mevcut durumunu ve meta bilgilerini döndürür
     id: UUID
@@ -127,6 +140,7 @@ class FunctionMetric(BaseModel):
     start_line: int = Field(ge=1, default=1)
     end_line: int = Field(ge=1, default=1)
     risk_score: float = Field(ge=0.0, default=0.0)
+    icc_density: float | None = None
 
 
 class DependencyEntry(BaseModel):
@@ -147,6 +161,25 @@ class HotspotEntry(BaseModel):
     rank: int = Field(ge=1, le=5)
 
 
+class CycleEntry(BaseModel):
+    nodes: list[str]
+    length: int
+    chain: str
+
+
+class GraphMetricEntry(BaseModel):
+    total_nodes: int
+    total_edges: int
+    total_cycles: int
+    density: float
+    avg_in_degree: float
+    avg_out_degree: float
+    max_in_degree: dict
+    max_out_degree: dict
+    strongly_connected_components: int
+    instability_scores: dict[str, float]
+
+
 class AnalysisResult(BaseModel):
     """
     Analiz motorunun /api/internal/runs/{run_id}/ingest endpoint'ine
@@ -164,7 +197,10 @@ class AnalysisResult(BaseModel):
     commit_tag: str | None = None
     files: list[FileMetric]
     functions: list[FunctionMetric]
+    nodes: list[dict] = []
     dependencies: list[DependencyEntry]
+    cycles: list[CycleEntry] = []
+    graph_metrics: GraphMetricEntry | None = None
     hotspots: list[HotspotEntry] = Field(max_length=5)
 
 

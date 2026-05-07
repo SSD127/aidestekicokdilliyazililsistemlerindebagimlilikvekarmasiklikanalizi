@@ -1,14 +1,17 @@
 # Backend API Specification
 
-This document describes the API endpoints that the backend team needs to implement.
+PolyMetric backend'inin frontend ile iletişim kurduğu HTTP arayüzünün resmi tanımı.
 
-## Overview
-
-The frontend sends a GitHub repository URL and expects to receive analysis data in the formats described below.
+> **Güncel kaynak:** `backend/app/schemas.py` Pydantic modelleri ve
+> `backend/contracts/examples/golden_analysis_result.json` örnek payload'ı bu
+> dökümanın altında yatan tek doğruluk kaynağıdır. Çelişki durumunda kod kazanır.
 
 ---
 
-## Endpoint: Analyze Repository
+## Endpoint: Analyze Repository (Senkron Sarmalayıcı)
+
+Frontend tek istekle GitHub URL gönderir, backend senkron olarak repo'yu indirir,
+parse eder, metrik hesaplar ve `AnalysisResult` JSON'unu döndürür.
 
 ### Request
 
@@ -17,318 +20,179 @@ The frontend sends a GitHub repository URL and expects to receive analysis data 
 **Headers:**
 ```
 Content-Type: application/json
+X-User-Id: <opsiyonel; verilmezse "local-dev-user" kullanılır>
 ```
 
-**Body:**
+**Body (`AnalyzeRequest`):**
 ```json
 {
   "github_url": "https://github.com/username/repository",
-  "branch": "main",  // optional, defaults to main
-  "include_tests": true  // optional, defaults to true
+  "branch": "main",
+  "include_tests": true
 }
 ```
+
+| Alan            | Tip      | Zorunlu | Açıklama                                                  |
+|-----------------|----------|---------|-----------------------------------------------------------|
+| `github_url`    | string   | evet    | Geçerli `https://github.com/owner/repo` formatında URL    |
+| `branch`        | string   | hayır   | Varsayılan `"main"`. 404 alınırsa `master` denenir         |
+| `include_tests` | boolean  | hayır   | Varsayılan `true`. Şu an kabul edilir, filtreleme yok      |
 
 ### Response
 
 **Status Code:** `200 OK`
 
-**Body:** JSON object containing the following keys:
+**Body:** `AnalysisResult` JSON. Örnek için bkz.
+[`backend/contracts/examples/golden_analysis_result.json`](../backend/contracts/examples/golden_analysis_result.json).
 
 ```json
 {
-  "complexity": [...],
-  "performance": {...},
-  "disk_space": {...},
-  "code_analysis": {...},
-  "file_metrics": [...]
+  "run_id": "8e35bc35-9480-47af-8635-965f9b3bdb0d",
+  "project_id": "6f6dd412-2e2d-4c71-99f0-7a48695fbc91",
+  "commit_hash": "a1b2c3d4e5f6",
+  "branch_name": "main",
+  "analyzed_at": "2026-04-30T10:00:00Z",
+  "parser_version": "polymetric-tree-sitter:v0.1.0",
+  "grammar_version": "tree-sitter-python:bundled",
+  "files":        [ /* FileMetric[] */       ],
+  "functions":    [ /* FunctionMetric[] */   ],
+  "dependencies": [ /* DependencyEntry[] */  ],
+  "hotspots":     [ /* HotspotEntry[]; max 5 */ ]
+}
+```
+
+`/api/analyze` ek olarak `timing`, `skipped_files`, `partial` gibi non-strict
+alanları da gönderir (frontend bunları gösterebilir veya yok sayabilir).
+
+---
+
+## Veri Yapıları
+
+Tüm tipler `backend/app/schemas.py` içinde Pydantic modeli olarak tanımlıdır;
+422 hata gelirse alan eksik veya tip hatalı demektir.
+
+### `FileMetric` (`files[]`)
+
+```json
+{
+  "path": "app/main.py",
+  "language": "python",
+  "loc": 120,
+  "complexity_score": 11,
+  "dependency_count": 4,
+  "maintainability_index": null
+}
+```
+
+- `complexity_score`: dosyadaki tüm fonksiyonların McCabe CC toplamı.
+- `loc`: yorum/boş satırlar hariç kod satırı sayısı.
+- `maintainability_index`: opsiyonel; şu an üretilmiyor (`null`).
+
+### `FunctionMetric` (`functions[]`)
+
+```json
+{
+  "file_path": "app/main.py",
+  "function_name": "create_run",
+  "cyclomatic_complexity": 13,
+  "halstead_score": 1840.5,
+  "loc": 36,
+  "start_line": 40,
+  "end_line": 75,
+  "risk_score": 10
+}
+```
+
+- `cyclomatic_complexity`: `1 + branch_count + loop_count`.
+- `halstead_score`: gerçek Halstead **Effort** (`E = D × V`).
+- `risk_score`: `risk.calculate_risk_level` çıkışından map edilen sayı
+  (`low=1`, `moderate=5`, `high=10`, `critical=18`).
+- `loc`: fonksiyonun çalıştırılabilir satırları (`executable_lines`).
+
+### `DependencyEntry` (`dependencies[]`)
+
+```json
+{
+  "source_path": "app/main.py",
+  "target_path": "app/storage.py",
+  "dependency_type": "import",
+  "source_symbol": null,
+  "target_symbol": null
+}
+```
+
+- `dependency_type`: `"import" | "call" | "inheritance" | "composition"`.
+- Sadece repo içindeki dosyalara işaret eden bağımlılıklar dahil edilir.
+
+### `HotspotEntry` (`hotspots[]`, en fazla 5 eleman)
+
+```json
+{
+  "file_path": "app/main.py",
+  "function_name": "create_run",
+  "risk_score": 10,
+  "reason": "Cyclomatic complexity: 13",
+  "rank": 1
 }
 ```
 
 ---
 
-## Data Structures
+## Hata Cevapları
 
-### 1. Complexity Data (`complexity`)
+| Kod | Anlam                                                                                  |
+|-----|----------------------------------------------------------------------------------------|
+| 400 | `github_url` geçersiz GitHub repo formatı                                              |
+| 413 | Repo çok büyük (`MAX_TOTAL_FILES * 10` aşıldı) — `RepoTooLargeError`                   |
+| 422 | `AnalysisResult` Pydantic doğrulamasından geçemedi                                     |
+| 502 | GitHub'dan zip indirilemedi (`requests.RequestException`)                              |
+| 500 | Beklenmedik analiz hatası                                                              |
 
-**Type:** Array of objects
-
-**Description:** List of files with their complexity scores
-
-**Structure:**
+Hata gövdesi formatı FastAPI standardındadır:
 ```json
-[
-  {
-    "name": "api/routes.py",
-    "complexity": 45,
-    "lines": 234
-  },
-  {
-    "name": "models/user.py",
-    "complexity": 72,
-    "lines": 456
-  }
-]
-```
-
-**Fields:**
-- `name` (string): File path relative to repository root
-- `complexity` (integer): Complexity score from 0-100
-- `lines` (integer): Number of lines in the file
-
----
-
-### 2. Performance Metrics (`performance`)
-
-**Type:** Object
-
-**Description:** Time and space complexity analysis
-
-**Structure:**
-```json
-{
-  "time_complexity": [
-    {
-      "complexity": "O(1)",
-      "count": 180,
-      "description": "Constant time"
-    },
-    {
-      "complexity": "O(n)",
-      "count": 95,
-      "description": "Linear"
-    }
-  ],
-  "space_complexity": [
-    {
-      "complexity": "O(1)",
-      "count": 230,
-      "description": "Constant space"
-    }
-  ],
-  "avg_execution_time": 25,
-  "memory_usage": 128.5,
-  "optimizable_functions": 32
-}
-```
-
-**Fields:**
-- `time_complexity` (array): Distribution of time complexity classes
-  - `complexity` (string): Big-O notation (e.g., "O(1)", "O(n)", "O(n²)")
-  - `count` (integer): Number of functions with this complexity
-  - `description` (string): Human-readable description
-- `space_complexity` (array): Distribution of space complexity classes
-- `avg_execution_time` (number): Average execution time in milliseconds
-- `memory_usage` (number): Memory usage in MB
-- `optimizable_functions` (integer): Count of functions that could be optimized
-
----
-
-### 3. Disk Space Data (`disk_space`)
-
-**Type:** Object
-
-**Description:** Disk usage breakdown by file type
-
-**Structure:**
-```json
-{
-  "file_types": [
-    {
-      "type": "Python",
-      "size_mb": 15.8,
-      "count": 234
-    },
-    {
-      "type": "JavaScript",
-      "size_mb": 8.3,
-      "count": 89
-    }
-  ],
-  "largest_files": [
-    {
-      "file": "static/images/banner_large.png",
-      "size_mb": 12.4
-    }
-  ],
-  "total_size_mb": 48.6,
-  "file_count": 456
-}
-```
-
-**Fields:**
-- `file_types` (array): Breakdown by file type
-  - `type` (string): File type name
-  - `size_mb` (number): Total size in megabytes
-  - `count` (integer): Number of files
-- `largest_files` (array): Top 5-10 largest files
-  - `file` (string): File path
-  - `size_mb` (number): File size in megabytes
-- `total_size_mb` (number): Total repository size
-- `file_count` (integer): Total number of files
-
----
-
-### 4. Code Analysis Data (`code_analysis`)
-
-**Type:** Object
-
-**Description:** Comprehensive code quality metrics
-
-**Structure:**
-```json
-{
-  "total_files": 234,
-  "total_lines": 45678,
-  "total_functions": 1234,
-  "total_classes": 156,
-  "code_quality_score": 82,
-  "test_coverage": 75,
-  "documentation_coverage": 68,
-  "duplication_rate": 8.5,
-  "languages": [
-    {
-      "language": "Python",
-      "percentage": 65.4,
-      "lines": 29873
-    }
-  ],
-  "issues": {
-    "critical": 2,
-    "warnings": 28,
-    "code_smells": 45,
-    "security_hotspots": 6
-  },
-  "dependencies": {
-    "total": 142,
-    "direct": 38,
-    "outdated": 12,
-    "vulnerable": 3
-  }
-}
-```
-
-**Fields:**
-- `total_files` (integer): Total number of code files
-- `total_lines` (integer): Total lines of code
-- `total_functions` (integer): Total number of functions
-- `total_classes` (integer): Total number of classes
-- `code_quality_score` (integer): Overall quality score (0-100)
-- `test_coverage` (integer): Test coverage percentage
-- `documentation_coverage` (integer): Documentation coverage percentage
-- `duplication_rate` (number): Code duplication percentage
-- `languages` (array): Language distribution
-  - `language` (string): Programming language name
-  - `percentage` (number): Percentage of codebase
-  - `lines` (integer): Lines of code
-- `issues` (object): Code quality issues
-  - `critical` (integer): Critical issues count
-  - `warnings` (integer): Warnings count
-  - `code_smells` (integer): Code smells count
-  - `security_hotspots` (integer): Security issues count
-- `dependencies` (object): Dependency information
-  - `total` (integer): Total dependencies
-  - `direct` (integer): Direct dependencies
-  - `outdated` (integer): Outdated dependencies
-  - `vulnerable` (integer): Dependencies with vulnerabilities
-
----
-
-### 5. File Metrics (`file_metrics`)
-
-**Type:** Array of objects
-
-**Description:** Detailed metrics for individual files
-
-**Structure:**
-```json
-[
-  {
-    "file": "src/api/routes/user_routes.py",
-    "lines": 345,
-    "complexity": 67,
-    "maintainability": 45,
-    "functions": 18,
-    "classes": 2
-  }
-]
-```
-
-**Fields:**
-- `file` (string): File path
-- `lines` (integer): Lines of code
-- `complexity` (integer): Complexity score (0-100)
-- `maintainability` (integer): Maintainability score (0-100)
-- `functions` (integer): Number of functions
-- `classes` (integer): Number of classes
-
----
-
-## Error Responses
-
-### 400 Bad Request
-```json
-{
-  "error": "Invalid GitHub URL",
-  "message": "The provided URL is not a valid GitHub repository"
-}
-```
-
-### 404 Not Found
-```json
-{
-  "error": "Repository not found",
-  "message": "The specified repository does not exist or is private"
-}
-```
-
-### 500 Internal Server Error
-```json
-{
-  "error": "Analysis failed",
-  "message": "An error occurred while analyzing the repository",
-  "details": "Optional error details"
-}
+{ "detail": "..." }
 ```
 
 ---
 
-## Implementation Notes
+## Asenkron Akış (Geriye Dönük Uyumluluk)
 
-### Suggested Tools and Libraries
+`POST /api/analyze` haricinde aynı backend, run-id polling akışını da sunar:
 
-**For Python Backend:**
-- `radon` - Cyclomatic complexity analysis
-- `pylint` - Code quality checking
-- `coverage.py` - Test coverage
-- `bandit` - Security analysis
-- GitHub API - Repository information
+- `POST /api/projects` → proje oluştur
+- `POST /api/projects/{project_id}/runs` → analiz başlat (arka plan)
+- `GET  /api/projects/{project_id}/runs/{run_id}/summary` → durum sorgula
+- `GET  /api/projects/{project_id}/runs/{run_id}/hotspots`
+- `GET  /api/projects/{project_id}/runs/{run_id}/dependency-graph`
+- `GET  /api/projects/{project_id}/trends?metric=...`
+- `GET  /api/projects/{project_id}/runs/{run_id}/ai-insight`
 
-**For Node.js Backend:**
-- `eslint` - Code quality
-- `complexity-report` - Complexity analysis
-- `istanbul/nyc` - Test coverage
-- Octokit - GitHub API client
-
-### Processing Flow
-
-1. Receive GitHub URL from frontend
-2. Clone or fetch repository (or use GitHub API)
-3. Run static analysis tools
-4. Calculate metrics (complexity, coverage, etc.)
-5. Aggregate results into the response format
-6. Return JSON response to frontend
-
-### Performance Considerations
-
-- Cache analysis results for frequently requested repositories
-- Implement queue system for long-running analyses
-- Return partial results with status updates for large repositories
-- Set timeout limits for analysis (e.g., 5 minutes)
+Detaylar için `backend/docs/api_contract.md`'ye bakınız.
 
 ---
 
-## Testing
+## Şu An Üretilmeyen Metrikler
 
-See `api_examples/` folder for sample request/response JSON files that you can use for testing.
+Aşağıdaki alanlar mevcut sürümde üretilmiyor; sonraki sprintlerde eklenecek
+araç entegrasyonlarını gerektiriyor:
 
-Use the mock data generator in `mock_data.py` to understand the expected data structure.
+- `test_coverage`, `documentation_coverage` → coverage.py / pydocstyle
+- `code_quality_score`, `code_smells` → pylint / ruff
+- `security_hotspots`, `vulnerable_dependencies` → bandit / pip-audit
+- `disk_space`, `time_complexity (O-notation)`, `space_complexity` → tasarım dışı
+
+Frontend bu alanların yokluğunu kabul eder ve karşılık gelen kartları gizler.
+
+---
+
+## Test
+
+`backend/contracts/examples/golden_analysis_result.json` örnek payload'ı şema ile
+birebir uyumludur. Manuel test:
+
+```bash
+uvicorn app.main:app --reload  # backend/ altında
+curl -X POST http://localhost:8000/api/analyze \
+  -H "Content-Type: application/json" \
+  -d '{"github_url":"https://github.com/psf/requests","branch":"main"}'
+```

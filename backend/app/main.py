@@ -22,7 +22,14 @@ from pydantic import ValidationError
 from requests import RequestException
 
 from app.config import get_settings
-from app.schemas import AnalysisResult, ProjectCreateRequest, ProjectResponse, RunCreateRequest, RunResponse
+from app.schemas import (
+    AnalysisResult,
+    AnalyzeRequest,
+    ProjectCreateRequest,
+    ProjectResponse,
+    RunCreateRequest,
+    RunResponse,
+)
 from app.services.ai_insight import generate_ai_insight
 from app.services.github_pipeline import RepoTooLargeError, validate_github_repo_url
 from app.storage import store
@@ -65,6 +72,71 @@ def ensure_internal_access(x_internal_api_key: str | None) -> None:
 def health() -> dict[str, str]:
     # Uygulamanın ayakta olduğunu ve hangi ortamda çalıştığını döndürür
     return {"status": "ok", "env": settings.app_env}
+
+
+# ---------------------------------------------------------------------------
+# Senkron analiz sarmalayıcı — frontend tek istek/tek yanıt akışı
+# ---------------------------------------------------------------------------
+
+@app.post("/api/analyze", response_model=AnalysisResult)
+def analyze_endpoint(
+    body: AnalyzeRequest,
+    x_user_id: str | None = Header(default=None),
+) -> AnalysisResult:
+    """
+    GitHub URL'den tek seferde analiz çalıştırıp AnalysisResult döndürür.
+
+    Dahili akış: proje + run kayıtları otomatik oluşturulur, analyze_repo()
+    senkron çalıştırılır, sonuç doğrulanıp döndürülür. Asenkron run akışını
+    bozmadan, frontend için kolay bir tek-istek arayüzü sağlar.
+    """
+    user_id = get_current_user_id(x_user_id)
+    github_url = str(body.github_url)
+    if not validate_github_repo_url(github_url):
+        raise HTTPException(status_code=400, detail="Gecerli bir GitHub repo URL giriniz.")
+
+    # Otomatik proje + run kayıtları (in-memory store ile geriye dönük uyumlu)
+    project = store.create_project(
+        owner_id=user_id,
+        payload=ProjectCreateRequest(
+            name=f"adhoc-{github_url.rstrip('/').split('/')[-1]}",
+            github_repo_url=body.github_url,
+            default_branch=body.branch,
+        ),
+    )
+    run = store.create_run(project_id=project.id, payload=RunCreateRequest(github_ref=body.branch))
+    store.update_run_status(run.id, "running")
+
+    # analyze_repo'yu burada import et — modul yuklenirken cyclic import riskini onler
+    from app.core.orchestrator import analyze_repo
+
+    try:
+        payload = analyze_repo(
+            run_id=run.id,
+            project_id=project.id,
+            repo_url=github_url,
+            ref=body.branch,
+        )
+    except RepoTooLargeError as exc:
+        store.update_run_status(run.id, "failed", error_message=str(exc))
+        raise HTTPException(status_code=413, detail=str(exc))
+    except RequestException as exc:
+        store.update_run_status(run.id, "failed", error_message=str(exc))
+        raise HTTPException(status_code=502, detail=f"GitHub erisim hatasi: {exc}")
+    except Exception as exc:
+        logger.exception("Analiz hatasi run_id=%s", run.id)
+        store.update_run_status(run.id, "failed", error_message=str(exc))
+        raise HTTPException(status_code=500, detail=f"Analiz hatasi: {exc}")
+
+    try:
+        result = AnalysisResult(**payload)
+    except ValidationError as exc:
+        store.update_run_status(run.id, "failed", error_message="schema validation failed")
+        raise HTTPException(status_code=422, detail=exc.errors())
+
+    store.ingest_analysis(run.id, payload)
+    store.update_run_status(run.id, "completed")
+    return result
 
 
 # ---------------------------------------------------------------------------
