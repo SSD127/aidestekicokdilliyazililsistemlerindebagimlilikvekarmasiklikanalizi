@@ -114,6 +114,9 @@ def build_analysis_payload(
     files: list[dict],
     functions: list[dict],
     dependencies: list[dict],
+    nodes: list[dict] = None,
+    cycles: list[dict] = None,
+    graph_metrics: dict = None,
     grammar_version: str | None = None,
 ) -> dict:
     """
@@ -135,6 +138,9 @@ def build_analysis_payload(
         "grammar_version": grammar_version,
         "files": files,
         "functions": functions,
+        "nodes": nodes or [],
         "dependencies": dependencies,
+        "cycles": cycles or [],
+        "graph_metrics": graph_metrics,
         "hotspots": hotspots,
     }

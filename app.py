@@ -21,6 +21,7 @@ from frontend.dashboard import (
     render_hotspots_tab,
     render_overview_tab,
     render_performance_tab,
+    render_network_tab,
 )
 from frontend.ui_components import (
     render_footer,
@@ -131,10 +132,11 @@ if st.session_state.analysis_data:
     )
     st.divider()
 
-    tab1, tab2, tab3, tab4 = st.tabs([
+    tab1, tab2, tab3, tab4, tab5 = st.tabs([
         "📊 Genel Bakış",
         "⚡ Karmaşıklık Dağılımı",
         "🔥 Hotspots",
+        "🕸️ Network Analysis",
         "📋 Detaylar",
     ])
 
@@ -145,6 +147,8 @@ if st.session_state.analysis_data:
     with tab3:
         render_hotspots_tab(data)
     with tab4:
+        render_network_tab(data)
+    with tab5:
         render_details_tab(data)
 
 else:

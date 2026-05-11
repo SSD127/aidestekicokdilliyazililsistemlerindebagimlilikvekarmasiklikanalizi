@@ -105,6 +105,8 @@ def _node_text(node: Any) -> str:
 
 
 def _location(node: Any) -> dict:
+    if node is None:
+        return {"start_line": 0, "start_col": 0, "end_line": 0, "end_col": 0}
     start_row, start_col = node.start_point
     end_row, end_col = node.end_point
     return {
@@ -278,7 +280,8 @@ def _iter_descendants(root: Any, types: set[str]) -> Iterable[Any]:
         if node.type in types:
             yield node
         for child in node.children:
-            stack.append(child)
+            if child is not None:
+                stack.append(child)
 
 
 def _import_entry(node: Any) -> dict:

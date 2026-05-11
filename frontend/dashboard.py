@@ -21,6 +21,7 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 import streamlit as st
+import streamlit.components.v1 as components
 
 from frontend.ui_components import get_complexity_rating, render_metric_cards
 
@@ -339,3 +340,137 @@ def render_details_tab(data: dict) -> None:
         "Not: test_coverage, documentation_coverage, security_hotspots, vulnerable_dependencies "
         "metrikleri henüz desteklenmiyor (pylint/coverage/bandit entegrasyonu sonraki sprintte)."
     )
+# ─── NETWORK ANALYSIS SEKMESİ ───
+# Bu fonksiyon, Bağımlılık Haritalama görevinin frontend görselleştirme kısmıdır.
+# 4 bölüm: Özet kartlar, Döngü listesi, Metrikler, İnteraktif grafik
+def render_network_tab(data: dict) -> None:
+    """Bağımlılık Haritalama ve Network Analysis sekmesini oluşturur.
+
+    Backend'den gelen analiz verilerini kullanarak projenin mimari
+    bağımlılık haritasını görselleştirir.
+
+    Args:
+        data: Backend'in döndürdüğü AnalysisResult JSON verisi.
+    """
+    # Backend'den gelen verileri al
+    dependencies = data.get("dependencies", [])     # Dosyalar arası import ilişkileri
+    cycles = data.get("cycles", [])                 # Döngüsel bağımlılıklar
+    metrics = data.get("graph_metrics", {})          # Grafik metrikleri
+
+    st.subheader("🕸️ Mimari Bağımlılık Haritası")
+    st.write("Dosyalar arasındaki import ilişkileri ve döngüsel bağımlılık analizi.")
+
+    if not dependencies:
+        st.info("Bağımlılık verisi bulunamadı.")
+        return
+
+    # ─── BÖLÜM 1: Özet Metrik Kartları ───
+    # 4 sütunlu kart düzeni ile temel grafik istatistiklerini gösterir
+    col1, col2, col3, col4 = st.columns(4)
+    with col1:
+        st.metric("Toplam Düğüm", metrics.get("total_nodes", 0))
+    with col2:
+        st.metric("Toplam Bağlantı", metrics.get("total_edges", 0))
+    with col3:
+        st.metric("Döngü Sayısı", len(cycles), delta=f"{len(cycles)} ⚠️" if cycles else "0 ✅", delta_color="inverse")
+    with col4:
+        st.metric("Grafik Yoğunluğu", f"{metrics.get('density', 0):.4f}")
+
+    st.divider()
+
+    # ─── BÖLÜM 2: Döngüsel Bağımlılık Analizi ───
+    # Tespit edilen döngüleri açılabilir paneller içinde listeler
+    st.markdown("#### 🔍 Döngüsel Bağımlılık Tespiti")
+    if cycles:
+        st.warning(f"Sistemde {len(cycles)} adet döngüsel bağımlılık tespit edildi! Bu durum spagetti kod riskini artırır.")
+        for i, cycle in enumerate(cycles, 1):
+            with st.expander(f"Döngü #{i}: {cycle.get('chain')}"):
+                st.write("**Dahil olan dosyalar:**")
+                for node in cycle.get("nodes", []):
+                    st.write(f"- `{node}`")
+    else:
+        st.success("✅ Tebrikler! Sistemde herhangi bir döngüsel bağımlılık bulunamadı.")
+
+    st.divider()
+
+    # ─── BÖLÜM 3: Mimari Metrikler ve Kararsızlık ───
+    # Sol: genel metrikler, Sağ: instability tablosu
+    col_m1, col_m2 = st.columns(2)
+    with col_m1:
+        st.markdown("#### 📈 Mimari Metrikler")
+        st.write(f"**Güçlü Bağlı Bileşenler (SCC):** {metrics.get('strongly_connected_components', 0)}")
+        st.write(f"**Ortalama Gelen Bağlantı:** {metrics.get('avg_in_degree', 0)}")
+        st.write(f"**Ortalama Giden Bağlantı:** {metrics.get('avg_out_degree', 0)}")
+        
+        max_in = metrics.get("max_in_degree", {})
+        st.write(f"**En Çok Bağımlılık Alan:** `{max_in.get('node', '-')}` ({max_in.get('degree', 0)})")
+        
+        max_out = metrics.get("max_out_degree", {})
+        st.write(f"**En Çok Bağımlı Olan:** `{max_out.get('node', '-')}` ({max_out.get('degree', 0)})")
+
+    with col_m2:
+        st.markdown("#### ⚖️ Kararsızlık Skorları (Instability)")
+        st.info("I = Ce / (Ca + Ce). 0 = Stabil, 1 = Kararsız. Stabil modüllerin değiştirilmesi zordur.")
+        instability = metrics.get("instability_scores", {})
+        if instability:
+            inst_df = pd.DataFrame([
+                {"Dosya": k, "Skor": v} for k, v in instability.items()
+            ]).sort_values("Skor", ascending=False).head(10)
+            st.dataframe(inst_df, use_container_width=True, hide_index=True)
+
+    st.divider()
+
+    # ─── BÖLÜM 4: İnteraktif Bağımlılık Grafiği (Pyvis) ───
+    # Renk: Yeşil=proje dosyası, Gri=dış kütüphane, Kırmızı=döngüsel
+    st.markdown("#### 🗺️ İnteraktif Bağımlılık Ağı")
+    try:
+        from pyvis.network import Network
+        import tempfile
+
+        # Grafik oluştur
+        net = Network(height="600px", width="100%", directed=True, bgcolor="#ffffff", font_color="#333333")
+        
+        # Düğümleri ekle
+        nodes = data.get("nodes", []) # Bu verinin AnalysisResult'da olması lazım, şemayı güncellemiştim
+        if not nodes:
+            # Fallback: dependencielerden çıkar
+            node_ids = set()
+            for d in dependencies:
+                node_ids.add(d["source_path"])
+                node_ids.add(d["target_path"])
+            for nid in node_ids:
+                net.add_node(nid, label=nid, size=20)
+        else:
+            for n in nodes:
+                is_in_cycle = any(n["id"] in c["nodes"] for c in cycles)
+                color = "#ef4444" if is_in_cycle else ("#22c55e" if n.get("type") == "project" else "#94a3b8")
+                net.add_node(n["id"], label=n["id"], color=color, size=25 if n.get("type") == "project" else 15)
+
+        # Kenarları ekle
+        for d in dependencies:
+            is_cycle_edge = False
+            for c in cycles:
+                c_nodes = c["nodes"]
+                for i in range(len(c_nodes)):
+                    if d["source_path"] == c_nodes[i] and d["target_path"] == c_nodes[(i+1)%len(c_nodes)]:
+                        is_cycle_edge = True
+                        break
+            
+            net.add_edge(
+                d["source_path"], 
+                d["target_path"], 
+                color="#ef4444" if is_cycle_edge else "#cbd5e1",
+                width=3 if is_cycle_edge else 1
+            )
+
+        # Geçici dosyaya kaydet ve oku
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".html") as tmp:
+            net.save_graph(tmp.name)
+            with open(tmp.name, 'r', encoding='utf-8') as f:
+                html_content = f.read()
+            components.html(html_content, height=650)
+            
+    except ImportError:
+        st.warning("Pyvis kütüphanesi yüklü değil. Grafik görselleştirilemiyor.")
+        st.write("Bağımlılık listesi:")
+        st.dataframe(pd.DataFrame(dependencies))

@@ -25,6 +25,7 @@ from app.core.payload_builder import (
 # HALİL'İN  OLAN METRİK MOTORU BURAYA EKLENDİ
 # metric_engine.py dosyasının app/core/ klasöründe olduğunu varsayıyoruz
 from app.core.metric_engine import ComplexityAnalyzer
+from app.core.graph_engine import GraphAnalyzer
 
 logger = logging.getLogger(__name__)
 
@@ -157,7 +158,15 @@ def analyze_repo(
 
     t0 = time.perf_counter()
     file_metrics, function_metrics = run_metrics(parsed)
-    dependencies = run_dependency_scan(parsed)
+    # Bağımlılık Haritalama ve Grafik Analizi (Network Analysis)
+    graph_engine = GraphAnalyzer()
+    graph_engine.build_graph(parsed)
+    graph_data = graph_engine.get_serializable_data()
+    
+    nodes = graph_data["nodes"]
+    dependencies = graph_data["edges"]
+    cycles = graph_data["cycles"]
+    graph_metrics = graph_data["metrics"]
     timing["metrics_sec"] = round(time.perf_counter() - t0, 3)
 
     timing["total_sec"] = round(sum(timing.values()), 3)
@@ -174,7 +183,10 @@ def analyze_repo(
         grammar_version=GRAMMAR_VERSION_PYTHON,
         files=file_metrics,
         functions=function_metrics,
+        nodes=nodes,
         dependencies=dependencies,
+        cycles=cycles,
+        graph_metrics=graph_metrics,
     )
     payload["timing"] = timing
     payload["skipped_files"] = skipped
