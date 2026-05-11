@@ -239,7 +239,7 @@ def render_hotspots_tab(data: dict) -> None:
             fn_df, use_container_width=True, hide_index=True,
             column_config={
                 "CC": st.column_config.ProgressColumn(
-                    "CC", min_value=0, max_value=max(fn_df["CC"].max(), 1),
+                    "CC", min_value=0, max_value=int(max(fn_df["CC"].max(), 1)),
                 ),
                 "Halstead Effort": st.column_config.NumberColumn(
                     "Halstead Effort", format="%.0f",
