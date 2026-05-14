@@ -52,11 +52,13 @@ class AnalyzeRequest(BaseModel):
     POST /api/analyze sarmalayıcı endpoint'inin request gövdesi.
     Frontend tek seferde GitHub URL gönderir, backend senkron analiz yapıp
     AnalysisResult döndürür.
+
+    include_tests=False ise, dosya adı (basename) `test_*.py` veya `*_test.py`
+    olan Python dosyaları analiz kapsamı dışı bırakılır; True ise tüm seçilen
+    kaynak dosyalar dahil edilir.
     """
     github_url: HttpUrl
     branch: str = "main"
-    # include_tests şimdilik kabul edilir ama yok sayılır; gelecekte test dosyalarını
-    # filtrelemek için kullanılacak
     include_tests: bool = True
 
 

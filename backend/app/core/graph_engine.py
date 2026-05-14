@@ -4,6 +4,7 @@ graph_engine.py — Bağımlılık Haritalama ve Grafik Analiz Motoru
 """
 
 import networkx as nx                               # Grafik veri yapısı ve algoritmaları (yönlü grafik, döngü tespiti vb.)
+from pathlib import PurePosixPath
 from typing import List, Dict, Set, Tuple, Optional  # Python tip belirtme araçları (kodun okunabilirliği için)
 from dataclasses import dataclass, field             # Veri sınıfı tanımlama aracı (otomatik __init__, __repr__ üretir)
 
@@ -79,9 +80,59 @@ class GraphAnalyzer:
         self._graph: nx.DiGraph = nx.DiGraph()      # Boş bir yönlü grafik oluştur
         self._project_files: Set[str] = set()        # Proje dosyalarını tutacak küme
 
+    def _match_project_file(self, candidates: list[str]) -> str | None:
+        normalized_candidates = [candidate.lstrip("./") for candidate in candidates if candidate]
+        for candidate in normalized_candidates:
+            if candidate in self._project_files:
+                return candidate
+        for project_file in self._project_files:
+            if any(project_file.endswith(f"/{candidate}") or project_file == candidate for candidate in normalized_candidates):
+                return project_file
+        return None
+
+    def _dependency_candidates(self, source: str, language: str, module: str) -> list[str]:
+        source_dir = PurePosixPath(source).parent
+
+        if language == "python":
+            return [module.replace(".", "/") + ".py"]
+
+        if language in {"javascript", "typescript"}:
+            extensions = [".js", ".ts", ".jsx", ".tsx"]
+            base = PurePosixPath(module)
+            if module.startswith("."):
+                base = source_dir / module
+            base_text = str(base).lstrip("./")
+            if PurePosixPath(base_text).suffix:
+                return [base_text]
+            return [base_text + ext for ext in extensions] + [
+                f"{base_text}/index{ext}" for ext in extensions
+            ]
+
+        if language == "java":
+            return [module.replace(".", "/") + ".java"]
+
+        if language == "csharp":
+            return [module.replace(".", "/") + ".cs", module.split(".")[-1] + ".cs"]
+
+        if language in {"c", "cpp"}:
+            include_path = PurePosixPath(module)
+            if not include_path.is_absolute():
+                include_path = source_dir / include_path
+            return [str(include_path).lstrip("./"), module]
+
+        return [module]
+
+    def _resolve_dependency_target(self, source: str, language: str, module: str) -> tuple[str, str]:
+        candidates = self._dependency_candidates(source, language, module)
+        matched = self._match_project_file(candidates)
+        if matched:
+            return matched, "project"
+        return module, "external"
+
    
     def build_graph(self, parsed_files: List[dict]):
-        """Parser (Tree-sitter) çıktılarından bağımlılık grafiğini oluşturur."""
+        """Parser (Tree-sitter) çıktılarından bağımlılık grafiğini oluşturur.
+        """
         # Önceki analiz verilerini temizle (yeni analiz için)
         self._graph.clear()
 
@@ -91,9 +142,10 @@ class GraphAnalyzer:
         # Her dosyayı düğüm olarak ekle ve import ilişkilerini kenar olarak oluştur
         for pf in parsed_files:
             source = pf["file_path"]   # Kaynak dosya (import yapan dosya)
+            language = pf.get("language", "unknown")
 
             # Kaynak dosyayı grafiğe düğüm olarak ekle
-            self._graph.add_node(source, type="project", language=pf.get("language", "unknown"))
+            self._graph.add_node(source, type="project", language=language)
 
             # Bu dosyanın tüm import'larını tara
             for imp in pf.get("imports", []):
@@ -104,16 +156,11 @@ class GraphAnalyzer:
                 if not module or module == "?":
                     continue
 
-                # Modül adını dosya yoluna dönüştür
-                # Örnek: "app.storage" → "app/storage.py"
-                target = module.replace(".", "/") + ".py"
-
-                # Hedef dosyanın proje içi mi yoksa dış kütüphane mi olduğunu belirle
-                node_type = "project" if target in self._project_files else "external"
+                target, node_type = self._resolve_dependency_target(source, language, module)
 
                 # Hedef düğümü grafiğe ekle (eğer henüz eklenmemişse)
                 if not self._graph.has_node(target):
-                    self._graph.add_node(target, type=node_type)
+                    self._graph.add_node(target, type=node_type, language="unknown")
 
                 # Kaynak → Hedef yönünde kenar (ok) ekle
                 # Bu kenar "source dosyası, target dosyasını import ediyor" anlamına gelir

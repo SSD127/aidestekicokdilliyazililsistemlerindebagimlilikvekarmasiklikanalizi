@@ -5,7 +5,7 @@ Bu dosya bir GitHub reposunu zip olarak indirip desteklenen kaynak kod
 dosyalarını çıkaran servisi içerir.
 Analiz orkestratörü (orchestrator.py) bu servisi çağırarak ham dosya içeriklerini alır.
 
-Desteklenen diller: Python, Java, JavaScript, TypeScript, C, C++
+Desteklenen diller: Python, Java, JavaScript, TypeScript, C, C++, C#
 """
 
 import io
@@ -27,6 +27,7 @@ SUPPORTED_EXTENSIONS = {
     ".c": "c",
     ".h": "c",
     ".hpp": "cpp",
+    ".cs": "csharp",
 }
 
 # Tek dosya için maksimum boyut — çok büyük dosyalar analizi yavaşlatır

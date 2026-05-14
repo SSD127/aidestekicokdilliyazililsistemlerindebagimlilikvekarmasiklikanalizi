@@ -8,11 +8,12 @@ from __future__ import annotations
 import hashlib
 import logging
 import time
+from pathlib import PurePosixPath
 from uuid import UUID
 
 from app.core.parser import (
-    GRAMMAR_VERSION_PYTHON,
     PARSER_VERSION as PARSER_LIB_VERSION,
+    get_grammar_version_summary,
     parse_file,
 )
 from app.core.payload_builder import (
@@ -31,6 +32,20 @@ logger = logging.getLogger(__name__)
 
 # Run metadata'sına yazılacak parser sürümü
 PARSER_VERSION = PARSER_LIB_VERSION
+
+
+def _is_test_file(path: str) -> bool:
+    """Basename `test_*.py` veya `*_test.py` ise True (include_tests=False kapsamı)."""
+    name = PurePosixPath(path).name
+    if not name.endswith(".py"):
+        return False
+    return name.startswith("test_") or name.endswith("_test.py")
+
+
+# ---------------------------------------------------------------------------
+# Faz 2: Parser çalıştırma — tree-sitter tabanlı parser.parse_file() köprüsü
+# ---------------------------------------------------------------------------
+
 
 def run_parser(files: list[dict]) -> tuple[list[dict], list[dict]]:
     parsed: list[dict] = []
@@ -137,6 +152,7 @@ def analyze_repo(
     project_id: UUID,
     repo_url: str,
     ref: str = "main",
+    include_tests: bool = True,
 ) -> dict:
     logger.info("Analiz basliyor: run_id=%s repo=%s ref=%s", run_id, repo_url, ref)
     timing: dict[str, float] = {}
@@ -149,6 +165,13 @@ def analyze_repo(
     files = download_repo(repo_url, ref=ref)
     timing["download_sec"] = round(time.perf_counter() - t0, 3)
     logger.info("%d kaynak dosya indirildi (%.2fs)", len(files), timing["download_sec"])
+
+    if not include_tests:
+        before = len(files)
+        files = [f for f in files if not _is_test_file(f["path"])]
+        logger.info("include_tests=False: %d test dosyasi haric, %d dosya kaldi", before - len(files), len(files))
+
+    # 2. Parse
 
     t0 = time.perf_counter()
     parsed, skipped = run_parser(files)
@@ -180,7 +203,7 @@ def analyze_repo(
         branch_name=ref,
         commit_hash=commit_hash,
         parser_version=PARSER_VERSION,
-        grammar_version=GRAMMAR_VERSION_PYTHON,
+        grammar_version=get_grammar_version_summary(pf.get("language", "") for pf in parsed),
         files=file_metrics,
         functions=function_metrics,
         nodes=nodes,
