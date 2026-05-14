@@ -81,7 +81,7 @@ class GraphAnalyzer:
 
    
     def build_graph(self, parsed_files: List[dict]):
-        """Parser (Tree-sitter) çıktılarından bağımlılık grafiğini oluşturur.
+        """Parser (Tree-sitter) çıktılarından bağımlılık grafiğini oluşturur."""
         # Önceki analiz verilerini temizle (yeni analiz için)
         self._graph.clear()
 
