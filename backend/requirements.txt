@@ -12,3 +12,6 @@ tree-sitter-python
 tree-sitter-java
 tree-sitter-javascript
 tree-sitter-typescript
+tree-sitter-c
+tree-sitter-cpp
+tree-sitter-c-sharp

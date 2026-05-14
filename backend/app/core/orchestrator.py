@@ -23,8 +23,8 @@ import time
 from uuid import UUID
 
 from app.core.parser import (
-    GRAMMAR_VERSION_PYTHON,
     PARSER_VERSION as PARSER_LIB_VERSION,
+    get_grammar_version_summary,
     parse_file,
 )
 from app.core.payload_builder import (
@@ -251,7 +251,7 @@ def analyze_repo(
         branch_name=ref,
         commit_hash=commit_hash,
         parser_version=PARSER_VERSION,
-        grammar_version=GRAMMAR_VERSION_PYTHON,
+        grammar_version=get_grammar_version_summary(pf.get("language", "") for pf in parsed),
         files=file_metrics,
         functions=function_metrics,
         dependencies=dependencies,

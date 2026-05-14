@@ -374,7 +374,7 @@ def build_payload(
     payload: dict = {
         "schema_version": SCHEMA_VERSION,
         "parser_version": PARSER_VERSION,
-        "grammar_version": GRAMMAR_VERSION_PYTHON,
+        "grammar_version": get_grammar_version_summary(file.get("language", "") for file in parsed_files),
         "repository": {
             "repo_url": repo_url,
             "ref": ref,
@@ -387,3 +387,462 @@ def build_payload(
     if commit_hash:
         payload["repository"]["commit_hash"] = commit_hash
     return payload
+
+
+# ---------------------------------------------------------------------------
+# Cok dilli parser registry
+# ---------------------------------------------------------------------------
+
+@dataclass(frozen=True)
+class LanguageSpec:
+    language: str
+    module_name: str
+    language_function: str
+    parser_name: str
+    grammar_version: str
+    function_types: set[str]
+    class_types: set[str]
+    import_types: set[str]
+    branch_types: set[str]
+    loop_types: set[str]
+    return_types: set[str]
+    comment_prefixes: tuple[str, ...]
+
+
+_COMMON_OPERAND_TYPES: set[str] = {
+    "identifier",
+    "property_identifier",
+    "field_identifier",
+    "type_identifier",
+    "namespace_identifier",
+    "integer",
+    "float",
+    "number",
+    "decimal_integer_literal",
+    "decimal_floating_point_literal",
+    "integer_literal",
+    "real_literal",
+    "string",
+    "string_literal",
+    "raw_string_literal",
+    "character_literal",
+    "char_literal",
+    "true",
+    "false",
+    "null",
+    "none",
+    "boolean_literal",
+}
+
+_NAME_NODE_TYPES = {
+    "identifier",
+    "property_identifier",
+    "field_identifier",
+    "type_identifier",
+}
+
+_LANGUAGE_SPECS: dict[str, LanguageSpec] = {
+    "java": LanguageSpec(
+        language="java",
+        module_name="tree_sitter_java",
+        language_function="language",
+        parser_name="tree-sitter-java",
+        grammar_version="tree-sitter-java:bundled",
+        function_types={"method_declaration", "constructor_declaration"},
+        class_types={"class_declaration", "interface_declaration", "enum_declaration", "record_declaration"},
+        import_types={"import_declaration"},
+        branch_types={"if_statement", "switch_expression", "switch_statement", "catch_clause", "ternary_expression"},
+        loop_types={"for_statement", "enhanced_for_statement", "while_statement", "do_statement"},
+        return_types={"return_statement"},
+        comment_prefixes=("//", "/*", "*"),
+    ),
+    "javascript": LanguageSpec(
+        language="javascript",
+        module_name="tree_sitter_javascript",
+        language_function="language",
+        parser_name="tree-sitter-javascript",
+        grammar_version="tree-sitter-javascript:bundled",
+        function_types={
+            "function_declaration",
+            "arrow_function",
+            "method_definition",
+            "generator_function_declaration",
+        },
+        class_types={"class_declaration"},
+        import_types={"import_statement", "export_statement", "call_expression"},
+        branch_types={"if_statement", "switch_statement", "catch_clause", "ternary_expression"},
+        loop_types={"for_statement", "for_in_statement", "while_statement", "do_statement"},
+        return_types={"return_statement"},
+        comment_prefixes=("//", "/*", "*"),
+    ),
+    "typescript": LanguageSpec(
+        language="typescript",
+        module_name="tree_sitter_typescript",
+        language_function="language_typescript",
+        parser_name="tree-sitter-typescript",
+        grammar_version="tree-sitter-typescript:bundled",
+        function_types={
+            "function_declaration",
+            "arrow_function",
+            "method_definition",
+            "method_signature",
+        },
+        class_types={"class_declaration", "interface_declaration", "enum_declaration", "type_alias_declaration"},
+        import_types={"import_statement", "export_statement", "call_expression"},
+        branch_types={"if_statement", "switch_statement", "catch_clause", "ternary_expression"},
+        loop_types={"for_statement", "for_in_statement", "while_statement", "do_statement"},
+        return_types={"return_statement"},
+        comment_prefixes=("//", "/*", "*"),
+    ),
+    "c": LanguageSpec(
+        language="c",
+        module_name="tree_sitter_c",
+        language_function="language",
+        parser_name="tree-sitter-c",
+        grammar_version="tree-sitter-c:bundled",
+        function_types={"function_definition"},
+        class_types={"struct_specifier", "union_specifier", "enum_specifier"},
+        import_types={"preproc_include"},
+        branch_types={"if_statement", "switch_statement", "case_statement", "conditional_expression"},
+        loop_types={"for_statement", "while_statement", "do_statement"},
+        return_types={"return_statement"},
+        comment_prefixes=("//", "/*", "*"),
+    ),
+    "cpp": LanguageSpec(
+        language="cpp",
+        module_name="tree_sitter_cpp",
+        language_function="language",
+        parser_name="tree-sitter-cpp",
+        grammar_version="tree-sitter-cpp:bundled",
+        function_types={"function_definition", "declaration"},
+        class_types={"class_specifier", "struct_specifier", "union_specifier", "enum_specifier"},
+        import_types={"preproc_include"},
+        branch_types={"if_statement", "switch_statement", "case_statement", "conditional_expression"},
+        loop_types={"for_statement", "while_statement", "do_statement", "range_based_for_statement"},
+        return_types={"return_statement"},
+        comment_prefixes=("//", "/*", "*"),
+    ),
+    "csharp": LanguageSpec(
+        language="csharp",
+        module_name="tree_sitter_c_sharp",
+        language_function="language",
+        parser_name="tree-sitter-c-sharp",
+        grammar_version="tree-sitter-c-sharp:bundled",
+        function_types={"method_declaration", "constructor_declaration", "local_function_statement"},
+        class_types={"class_declaration", "interface_declaration", "struct_declaration", "enum_declaration", "record_declaration"},
+        import_types={"using_directive"},
+        branch_types={"if_statement", "switch_statement", "switch_expression", "catch_clause", "conditional_expression"},
+        loop_types={"for_statement", "foreach_statement", "while_statement", "do_statement"},
+        return_types={"return_statement"},
+        comment_prefixes=("//", "/*", "*"),
+    ),
+}
+
+GRAMMAR_VERSIONS: dict[str, str] = {
+    "python": GRAMMAR_VERSION_PYTHON,
+    **{language: spec.grammar_version for language, spec in _LANGUAGE_SPECS.items()},
+}
+
+_parser_cache: dict[str, Any] = {}
+
+
+def _build_parser_from_module(module_name: str, language_function: str) -> Any:
+    import importlib
+    import tree_sitter  # pyright: ignore[reportMissingImports]
+
+    module = importlib.import_module(module_name)
+    language = tree_sitter.Language(getattr(module, language_function)())
+    try:
+        return tree_sitter.Parser(language)
+    except TypeError:
+        parser = tree_sitter.Parser()
+        if hasattr(parser, "set_language"):
+            parser.set_language(language)
+        else:
+            parser.language = language
+        return parser
+
+
+def _get_parser_for_spec(spec: LanguageSpec) -> Any:
+    if spec.language not in _parser_cache:
+        _parser_cache[spec.language] = _build_parser_from_module(spec.module_name, spec.language_function)
+    return _parser_cache[spec.language]
+
+
+def _find_first_descendant(node: Any, types: set[str]) -> Any | None:
+    stack = [node]
+    while stack:
+        current = stack.pop()
+        if current.type in types:
+            return current
+        stack.extend(reversed(current.children))
+    return None
+
+
+def _nearest_parent(node: Any, types: set[str]) -> Any | None:
+    current = node.parent
+    while current is not None:
+        if current.type in types:
+            return current
+        current = current.parent
+    return None
+
+
+def _generic_function_name(node: Any) -> str:
+    name_node = node.child_by_field_name("name")
+    if name_node is not None:
+        return _node_text(name_node)
+
+    declarator = node.child_by_field_name("declarator")
+    if declarator is not None:
+        found = _find_first_descendant(declarator, _NAME_NODE_TYPES)
+        if found is not None:
+            return _node_text(found)
+
+    parent = _nearest_parent(node, {"variable_declarator", "assignment_expression", "pair"})
+    if parent is not None:
+        parent_name = parent.child_by_field_name("name") or parent.child_by_field_name("left")
+        if parent_name is not None:
+            found = _find_first_descendant(parent_name, _NAME_NODE_TYPES)
+            if found is not None:
+                return _node_text(found)
+
+    found = _find_first_descendant(node, _NAME_NODE_TYPES)
+    return _node_text(found) if found is not None else "<anonymous>"
+
+
+def _generic_class_name(node: Any) -> str:
+    name_node = node.child_by_field_name("name")
+    if name_node is not None:
+        return _node_text(name_node)
+    found = _find_first_descendant(node, _NAME_NODE_TYPES)
+    return _node_text(found) if found is not None else "?"
+
+
+def _qualified_name(node: Any, base_name: str, class_types: set[str]) -> str:
+    names: list[str] = []
+    current = node.parent
+    while current is not None:
+        if current.type in class_types:
+            names.append(_generic_class_name(current))
+        current = current.parent
+    return ".".join(reversed(names)) + "." + base_name if names else base_name
+
+
+def _generic_parameters(node: Any) -> list[dict]:
+    params_node = node.child_by_field_name("parameters")
+    if params_node is None:
+        return []
+
+    params: list[dict] = []
+    seen: set[str] = set()
+    for child in _iter_descendants(params_node, _NAME_NODE_TYPES):
+        name = _node_text(child)
+        if name not in seen:
+            seen.add(name)
+            params.append({"name": name, "kind": "positional"})
+    return params
+
+
+def _walk_for_halstead_with_spec(node: Any, counts: _HalsteadCounts) -> None:
+    if node.type == "comment":
+        return
+    if node.type in _COMMON_OPERAND_TYPES:
+        text = _node_text(node)
+        counts.operands_total += 1
+        counts.operands_unique.add(text)
+        return
+    if not node.is_named and node.child_count == 0:
+        text = _node_text(node).strip()
+        if text:
+            counts.operators_total += 1
+            counts.operators_unique.add(text)
+        return
+    for child in node.children:
+        _walk_for_halstead_with_spec(child, counts)
+
+
+def _count_control_flow(node: Any, spec: LanguageSpec) -> tuple[int, int, int]:
+    branch = 1 if node.type in spec.branch_types else 0
+    loop = 1 if node.type in spec.loop_types else 0
+    ret = 1 if node.type in spec.return_types else 0
+    for child in node.children:
+        b, l, r = _count_control_flow(child, spec)
+        branch += b
+        loop += l
+        ret += r
+    return branch, loop, ret
+
+
+def _body_or_self(node: Any) -> Any:
+    return node.child_by_field_name("body") or node
+
+
+def _build_generic_function_entry(node: Any, content: str, file_id_prefix: str, spec: LanguageSpec) -> dict:
+    body_node = _body_or_self(node)
+    counts = _HalsteadCounts()
+    _walk_for_halstead_with_spec(body_node, counts)
+    branch, loop, ret = _count_control_flow(body_node, spec)
+
+    start_line = body_node.start_point[0] + 1
+    end_line = body_node.end_point[0] + 1
+    name = _generic_function_name(node)
+    qualified = _qualified_name(node, name, spec.class_types)
+
+    return {
+        "name": qualified,
+        "qualified_name": qualified,
+        "kind": "function",
+        "parameters": _generic_parameters(node),
+        "branch_count": branch,
+        "loop_count": loop,
+        "return_count": ret,
+        "executable_lines": _count_executable_lines(content, start_line, end_line),
+        "unique_operators": len(counts.operators_unique),
+        "total_operators": counts.operators_total,
+        "unique_operands": len(counts.operands_unique),
+        "total_operands": counts.operands_total,
+        "location": _location(node),
+        "ast_node_id": f"{file_id_prefix}-{node.id}",
+    }
+
+
+def _build_generic_class_entry(node: Any, file_id_prefix: str, spec: LanguageSpec) -> dict:
+    name = _generic_class_name(node)
+    methods = [
+        _generic_function_name(child)
+        for child in _iter_descendants(node, spec.function_types)
+    ]
+    return {
+        "name": name,
+        "qualified_name": name,
+        "methods": methods,
+        "location": _location(node),
+        "ast_node_id": f"{file_id_prefix}-{node.id}",
+    }
+
+
+def _extract_quoted_or_bracketed_module(text: str) -> str | None:
+    for left, right in (("\"", "\""), ("'", "'"), ("<", ">")):
+        if left in text:
+            start = text.find(left) + 1
+            end = text.find(right, start)
+            if end > start:
+                return text[start:end]
+    return None
+
+
+def _generic_import_entry(node: Any, spec: LanguageSpec) -> dict | None:
+    text = _node_text(node).strip()
+    location = _location(node)
+    module = "?"
+    kind = "import"
+
+    if spec.language in {"javascript", "typescript"}:
+        if node.type == "call_expression" and not text.startswith("require"):
+            return None
+        module = _extract_quoted_or_bracketed_module(text) or "?"
+        kind = "require" if text.startswith("require") else "import"
+    elif spec.language == "java":
+        module = text.removeprefix("import").replace("static", "").strip().rstrip(";").strip()
+        kind = "import"
+    elif spec.language in {"c", "cpp"}:
+        module = _extract_quoted_or_bracketed_module(text) or "?"
+        kind = "include"
+    elif spec.language == "csharp":
+        module = text.removeprefix("using").strip().rstrip(";").strip()
+        if "=" in module:
+            module = module.split("=", 1)[1].strip()
+        kind = "using"
+
+    if not module or module == "?":
+        return None
+    return {
+        "kind": kind,
+        "module": module,
+        "raw_text": text,
+        "location": location,
+    }
+
+
+def _loc_code_for_language(content: str, prefixes: tuple[str, ...]) -> int:
+    count = 0
+    for line in content.splitlines():
+        stripped = line.strip()
+        if not stripped or stripped.startswith(prefixes):
+            continue
+        count += 1
+    return count
+
+
+def parse_generic_file(file_path: str, content: str, spec: LanguageSpec) -> dict:
+    parser = _get_parser_for_spec(spec)
+    tree = parser.parse(content.encode("utf-8"))
+    root = tree.root_node
+    file_id_prefix = spec.language[0]
+
+    functions = [
+        _build_generic_function_entry(fn, content, file_id_prefix, spec)
+        for fn in _iter_descendants(root, spec.function_types)
+    ]
+    classes = [
+        _build_generic_class_entry(cls, file_id_prefix, spec)
+        for cls in _iter_descendants(root, spec.class_types)
+    ]
+
+    imports: list[dict] = []
+    for imp in _iter_descendants(root, spec.import_types):
+        entry = _generic_import_entry(imp, spec)
+        if entry is not None:
+            imports.append(entry)
+
+    lines = content.splitlines()
+    return {
+        "file_path": file_path,
+        "language": spec.language,
+        "encoding": "utf-8",
+        "parser": spec.parser_name,
+        "summary": {
+            "loc_total": len(lines),
+            "loc_code": _loc_code_for_language(content, spec.comment_prefixes),
+            "function_count": len(functions),
+            "class_count": len(classes),
+            "branch_count": sum(f["branch_count"] for f in functions),
+            "loop_count": sum(f["loop_count"] for f in functions),
+            "import_count": len(imports),
+        },
+        "imports": imports,
+        "functions": functions,
+        "classes": classes,
+        "ast": {
+            "root_type": root.type,
+            "nodes": [
+                {
+                    "id": f"{file_id_prefix}-root",
+                    "type": root.type,
+                    "parent_id": None,
+                    "named": root.is_named,
+                    "location": _location(root),
+                }
+            ],
+        },
+    }
+
+
+def get_grammar_version_summary(languages: Iterable[str] | None = None) -> str:
+    selected = set(languages or GRAMMAR_VERSIONS)
+    return ", ".join(
+        f"{language}={version}"
+        for language, version in sorted(GRAMMAR_VERSIONS.items())
+        if language in selected
+    )
+
+
+def parse_file(file_path: str, content: str, language: str) -> dict:
+    normalized = language.lower()
+    if normalized == "python":
+        return parse_python_file(file_path, content)
+    spec = _LANGUAGE_SPECS.get(normalized)
+    if spec is None:
+        raise NotImplementedError(f"Tree-sitter parser implementasyonu '{language}' icin yok.")
+    return parse_generic_file(file_path, content, spec)
