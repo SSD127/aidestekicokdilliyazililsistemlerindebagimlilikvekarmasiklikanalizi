@@ -116,6 +116,7 @@ def analyze_endpoint(
             project_id=project.id,
             repo_url=github_url,
             ref=body.branch,
+            include_tests=body.include_tests,
         )
     except RepoTooLargeError as exc:
         store.update_run_status(run.id, "failed", error_message=str(exc))

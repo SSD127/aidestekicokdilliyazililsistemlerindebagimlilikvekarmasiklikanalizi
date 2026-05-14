@@ -20,6 +20,7 @@ import hashlib
 import logging
 import math
 import time
+from pathlib import PurePosixPath
 from uuid import UUID
 
 from app.core.parser import (
@@ -39,6 +40,14 @@ logger = logging.getLogger(__name__)
 
 # Run metadata'sına yazılacak parser sürümü; parser.py modülüyle aynı kaynaktan gelir
 PARSER_VERSION = PARSER_LIB_VERSION
+
+
+def _is_test_file(path: str) -> bool:
+    """Basename `test_*.py` veya `*_test.py` ise True (include_tests=False kapsamı)."""
+    name = PurePosixPath(path).name
+    if not name.endswith(".py"):
+        return False
+    return name.startswith("test_") or name.endswith("_test.py")
 
 
 # ---------------------------------------------------------------------------
@@ -207,6 +216,7 @@ def analyze_repo(
     project_id: UUID,
     repo_url: str,
     ref: str = "main",
+    include_tests: bool = True,
 ) -> dict:
     """
     Uçtan uca analiz akışını yönetir ve AnalysisResult payload'ını döndürür.
@@ -220,6 +230,11 @@ def analyze_repo(
     files = download_repo(repo_url, ref=ref)
     timing["download_sec"] = round(time.perf_counter() - t0, 3)
     logger.info("%d kaynak dosya indirildi (%.2fs)", len(files), timing["download_sec"])
+
+    if not include_tests:
+        before = len(files)
+        files = [f for f in files if not _is_test_file(f["path"])]
+        logger.info("include_tests=False: %d test dosyasi haric, %d dosya kaldi", before - len(files), len(files))
 
     # 2. Parse
     t0 = time.perf_counter()

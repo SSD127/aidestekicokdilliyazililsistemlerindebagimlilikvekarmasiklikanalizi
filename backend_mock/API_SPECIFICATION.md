@@ -36,7 +36,7 @@ X-User-Id: <opsiyonel; verilmezse "local-dev-user" kullanılır>
 |-----------------|----------|---------|-----------------------------------------------------------|
 | `github_url`    | string   | evet    | Geçerli `https://github.com/owner/repo` formatında URL    |
 | `branch`        | string   | hayır   | Varsayılan `"main"`. 404 alınırsa `master` denenir         |
-| `include_tests` | boolean  | hayır   | Varsayılan `true`. Şu an kabul edilir, filtreleme yok      |
+| `include_tests` | boolean  | hayır   | Varsayılan `true`. `false` iken `test_*.py` ve `*_test.py` (basename) hariç tutulur |
 
 ### Response
 

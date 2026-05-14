@@ -15,3 +15,4 @@ tree-sitter-typescript
 tree-sitter-c
 tree-sitter-cpp
 tree-sitter-c-sharp
+pytest

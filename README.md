@@ -27,6 +27,38 @@ Bu repo, “Mini SonarQube” benzeri bir **statik analiz** sistemi geliştirir:
 - **Merkezi Veri**: Supabase üzerinde kullanıcı/proje/run/metrik/graph kayıtları
 - **Run modeli**: her analiz çalıştırması bir “run” olarak saklanır (trend için)
 
+## Repo Durumu
+Uygulama kodu mevcuttur: **FastAPI** backend ([`backend/app/main.py`](backend/app/main.py)), GitHub zip indirme ve dosya seçimi ([`backend/app/services/github_pipeline.py`](backend/app/services/github_pipeline.py)), analiz orkestratörü ([`backend/app/core/orchestrator.py`](backend/app/core/orchestrator.py)), Tree-sitter tabanlı parser ([`backend/app/core/parser.py`](backend/app/core/parser.py)), **Streamlit** arayüz kökü ([`app.py`](app.py), [`frontend/`](frontend/)).
+
+### Desteklenen uzantılar (indirme / ayrıştırma)
+Backend `SUPPORTED_EXTENSIONS` ile uyumlu: `.py`, `.java`, `.js`, `.ts`, `.c`, `.h`, `.cpp`, `.cc`, `.cxx`, `.hpp`, `.cs`.
+
+**Metrik ve risk üretimi** (McCabe, Halstead, hotspot) şu an **Python** kaynakları için tam akışta kullanılır. Diğer diller Tree-sitter ile ayrıştırılabilir; tam ürün doğrulaması ağırlıklı olarak Python üzerindedir.
+
+## Kurulum ve çalıştırma
+
+### Backend
+```bash
+cd backend
+pip install -r requirements.txt
+uvicorn app.main:app --reload
+```
+API varsayılan olarak `http://127.0.0.1:8000` üzerinde ayağa kalkar. Sağlık kontrolü: `GET /health`.
+
+### Frontend (Streamlit)
+Depo kökünden:
+```bash
+pip install -r requirements.txt
+streamlit run app.py
+```
+
+### Birim testleri
+```bash
+cd backend
+pytest
+```
+`pytest.ini` içinde `pythonpath = .` tanımlıdır; komutların `backend` dizininde çalıştırılması gerekir.
+
 ## Takım Rolleri (5 kişi)
 - **Backend & Scrum Master : Supabase şema/ER, Auth+RLS, API endpoint’leri, GitHub pipeline, Kanban/sprint yönetimi
 - **Engine Lead**: Tree-sitter ile ayrıştırma (AST/CST)
@@ -34,13 +66,10 @@ Bu repo, “Mini SonarQube” benzeri bir **statik analiz** sistemi geliştirir:
 - **UI/UX Lead**: Panel ve görselleştirmeler (grafikler/heatmap)
 - **Network Lead**: bağımlılık grafiği + döngüsel bağımlılık raporu
 
-## Repo Durumu
-Şu an repo, ilk dokümantasyon dosyalarını içermektedir. Uygulama kodu ekip planına göre kademeli olarak eklenecektir.
-
 ## Dokümanlar
 - `presentationanddocumentation/`: ilgili PDF/dokümanlar
-- `backend/`: FastAPI backend başlangıç iskeleti ve API uçları
+- `backend/`: FastAPI uygulaması ve analiz motoru
+- `backend_mock/`: mock API ve ekip notları
 
 ## Lisans
 Bu proje ders/proje kapsamındadır. Lisans seçimi ekip kararına göre eklenecektir.
-

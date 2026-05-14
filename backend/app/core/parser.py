@@ -54,6 +54,8 @@ _BRANCH_TYPES: set[str] = {
     "case_clause",
     "except_clause",
     "conditional_expression",
+    "assert_statement",
+    "with_statement",
 }
 
 _LOOP_TYPES: set[str] = {
@@ -339,15 +341,6 @@ def parse_python_file(file_path: str, content: str) -> dict:
             ],
         },
     }
-
-
-def parse_file(file_path: str, content: str, language: str) -> dict:
-    if language == "python":
-        return parse_python_file(file_path, content)
-    raise NotImplementedError(
-        f"Tree-sitter parser implementasyonu '{language}' icin Engine Lead "
-        f"tarafindan ayni modul icine eklenecek."
-    )
 
 
 def build_payload(
